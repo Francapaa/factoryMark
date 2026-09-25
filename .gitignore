@@ -1,0 +1,23 @@
+# Python / uv
+__pycache__/
+*.py[cod]
+.venv/
+backend/.venv/
+backend/data/cache/
+backend/.env
+
+# Node / Next
+node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env*.local
+frontend/*.tsbuildinfo
+
+# OS / editor
+.DS_Store
+*.pem
+.vscode/
+.idea/
+
+# Secrets
+.env

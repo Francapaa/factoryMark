@@ -1,0 +1,51 @@
+"""FastAPI entrypoint - setup mínimo, sin llamadas pagas por defecto."""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from factorymark.config import settings
+from factorymark.state import AnalyzeRequest, AnalyzeResponse, DraftPost
+
+app = FastAPI(title=settings.app_name)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@app.get("/health")
+def health() -> dict:
+    return {
+        "status": "ok",
+        "app": settings.app_name,
+        "places_configured": bool(settings.google_places_api_key),
+        "limits": {
+            "max_competitors": settings.max_competitors,
+            "max_reviews_per_place": settings.max_reviews_per_place,
+        },
+    }
+
+
+@app.post("/api/analyze", response_model=AnalyzeResponse)
+def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
+    # Stub intencional: no llama a Google Places hasta Fase Researcher.
+    # Así no se gasta cuota durante el setup.
+    return AnalyzeResponse(
+        competitors=[],
+        clusters=[],
+        opportunities=[],
+        draft_post=DraftPost(
+            copy_text=f"Borrador para {req.business_type} en {req.zone} (pipeline aún no implementado)."
+        ),
+        meta={"stub": True, "message": "Researcher/Analyst pendientes de implementación"},
+    )
+
+
+def run() -> None:
+    import uvicorn
+
+    uvicorn.run("factorymark.main:app", host="127.0.0.1", port=8000, reload=True)
