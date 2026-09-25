@@ -6,7 +6,7 @@ Wave 3: publicación real vía Meta Graph API / LinkedIn API detrás de
 
 from __future__ import annotations
 
-from factorymark.state import DraftPost
+from state import DraftPost
 
 # Feature flag: Wave 3 lo pone en True con OAuth configurado.
 PUBLISH_ENABLED = False

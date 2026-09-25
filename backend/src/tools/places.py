@@ -17,15 +17,15 @@ from pathlib import Path
 import httpx
 from tenacity import retry, retry_if_exception, stop_after_attempt, wait_exponential
 
-from factorymark.config import settings
-from factorymark.state import Competitor
+from config import settings
+from state import Competitor
 
 PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 def default_cache_dir() -> Path:
-    # backend/src/factorymark/tools/places.py -> parents[2] == backend/
+    # backend/src/tools/places.py -> parents[2] == backend/
     return Path(__file__).resolve().parents[2] / "data" / "cache"
 
 

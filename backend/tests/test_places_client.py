@@ -3,7 +3,7 @@
 import httpx
 import pytest
 
-from factorymark.tools import places
+from tools import places
 
 
 def _client(handler) -> httpx.Client:
