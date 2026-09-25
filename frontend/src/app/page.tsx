@@ -1,3 +1,5 @@
+import AnalyzeForm from "@/components/AnalyzeForm";
+
 async function getHealth() {
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
   try {
@@ -25,13 +27,14 @@ export default async function Home() {
           Backend FastAPI + frontend Next.js listos para la Fase 1.
         </p>
         <div className="rounded-xl border border-zinc-200 p-4 text-sm dark:border-zinc-800">
-          <p className="font-medium">Backend: {health ? `✅ ${health.app}` : "⚠️ no conectado"}</p>
+          <p className="font-medium">          Backend: {health ? `✅ ${health.app}` : "⚠️ no conectado (modo mock)"}</p>
           <p className="mt-1 text-zinc-500">
             {health
-              ? "GET /health responde. Siguiente paso: implementar Researcher con cache para cuidar cuota."
-              : "Levantá el backend con `cd backend && uv run uvicorn factorymark.main:app --reload`."}
+              ? "GET /health responde. Abajo podés probar el flujo con datos mock."
+              : "Levantá el backend con `cd backend && uv run uvicorn factorymark.main:app --reload`, o usá el modo mock."}
           </p>
         </div>
+        <AnalyzeForm />
       </main>
     </div>
   );
