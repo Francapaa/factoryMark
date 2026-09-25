@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from config import settings
 from main import app
 
 client = TestClient(app)
@@ -11,7 +12,8 @@ def test_health_ok():
     assert r.json()["status"] == "ok"
 
 
-def test_analyze_stub_does_not_call_external_apis():
+def test_analyze_stub_does_not_call_external_apis(monkeypatch):
+    monkeypatch.setattr(settings, "auth_disabled", True)
     r = client.post(
         "/api/analyze",
         json={"business_type": "café", "zone": "Palermo Soho"},

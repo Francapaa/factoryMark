@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from config import settings
 from main import app
 from publisher import PUBLISH_ENABLED, build_draft, set_status
 
@@ -26,7 +27,8 @@ def test_set_status_transitions():
     assert set_status(draft, False).status == "rejected"
 
 
-def test_approve_endpoint():
+def test_approve_endpoint(monkeypatch):
+    monkeypatch.setattr(settings, "auth_disabled", True)
     r = client.post("/api/approve", json={"approved": True})
     assert r.status_code == 200 and r.json()["status"] == "approved"
     r = client.post("/api/approve", json={"approved": False})

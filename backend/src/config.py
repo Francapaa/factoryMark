@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "gpt-4o-mini"
 
+    # Neon Auth (login solo con Google, verificado por JWKS en src/auth.py)
+    neon_auth_base_url: str = ""
+    neon_auth_jwks_url: str = ""  # override opcional; por defecto base + /.well-known/jwks.json
+    # Solo desarrollo local sin Neon: saltea la verificación (nunca en prod)
+    auth_disabled: bool = False
+
     # Límites para no quemar cuota de Google Places
     max_competitors: int = 10
     max_reviews_per_place: int = 20
