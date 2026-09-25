@@ -2,10 +2,10 @@
 
 from datetime import UTC, datetime, timedelta
 
-from factorymark.nlp.cluster import cluster_reviews
-from factorymark.nlp.embeddings import embed_texts
-from factorymark.nlp.scoring import competitive_score
-from factorymark.nlp.sentiment import score_sentiment, trend_by_month
+from nlp.cluster import cluster_reviews
+from nlp.embeddings import embed_texts
+from nlp.scoring import competitive_score
+from nlp.sentiment import score_sentiment, trend_by_month
 
 PRAISE = [
     "El café es riquísimo y la atención excelente, vuelvo siempre",

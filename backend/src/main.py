@@ -4,9 +4,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from factorymark.config import settings
-from factorymark.publisher import build_draft, set_status
-from factorymark.state import AnalyzeRequest, AnalyzeResponse, DraftPost
+from config import settings
+from publisher import build_draft, set_status
+from state import AnalyzeRequest, AnalyzeResponse, DraftPost
 
 app = FastAPI(title=settings.app_name)
 
@@ -61,6 +61,14 @@ def approve(req: ApproveRequest) -> DraftPost:
 
 
 def run() -> None:
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
     import uvicorn
 
-    uvicorn.run("factorymark.main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+
+
+if __name__ == "__main__":
+    run()

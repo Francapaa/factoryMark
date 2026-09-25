@@ -5,8 +5,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from factorymark.main import app
-from factorymark.publisher import PUBLISH_ENABLED, build_draft, set_status
+from main import app
+from publisher import PUBLISH_ENABLED, build_draft, set_status
 
 client = TestClient(app)
 

@@ -6,8 +6,8 @@ import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from factorymark.nlp.sentiment import score_sentiment
-from factorymark.state import ReviewCluster
+from nlp.sentiment import score_sentiment
+from state import ReviewCluster
 
 
 def _top_terms(vectorizer: TfidfVectorizer, centroid: np.ndarray, n: int = 3) -> str:
