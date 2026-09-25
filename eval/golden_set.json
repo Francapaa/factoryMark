@@ -1,0 +1,7 @@
+[
+  {"id": "caso-01", "business_type": "café de especialidad", "zone": "Palermo Soho, Buenos Aires", "expected_insight": "competidores flojos en horario de tarde", "min_competitors": 3},
+  {"id": "caso-02", "business_type": "pizzería", "zone": "Caballito, Buenos Aires", "expected_insight": "quejas recurrentes por demora en delivery", "min_competitors": 3},
+  {"id": "caso-03", "business_type": "barbería", "zone": "Villa Crespo, Buenos Aires", "expected_insight": "nadie ofrece reserva online", "min_competitors": 2},
+  {"id": "caso-04", "business_type": "panadería", "zone": "Belgrano, Buenos Aires", "expected_insight": "elogios a masa madre que podemos replicar", "min_competitors": 2},
+  {"id": "caso-05", "business_type": "restaurante vegano", "zone": "Colegiales, Buenos Aires", "expected_insight": "precios altos como oportunidad de entrada", "min_competitors": 2}
+]

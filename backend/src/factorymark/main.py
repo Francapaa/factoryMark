@@ -2,8 +2,10 @@
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from factorymark.config import settings
+from factorymark.publisher import build_draft, set_status
 from factorymark.state import AnalyzeRequest, AnalyzeResponse, DraftPost
 
 app = FastAPI(title=settings.app_name)
@@ -43,6 +45,19 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
         ),
         meta={"stub": True, "message": "Researcher/Analyst pendientes de implementación"},
     )
+
+
+class ApproveRequest(BaseModel):
+    approved: bool
+    opportunity_title: str = "horario de tarde sin competencia"
+    brand_name: str = "Café Ejemplo"
+
+
+@app.post("/api/approve", response_model=DraftPost)
+def approve(req: ApproveRequest) -> DraftPost:
+    # Mock sin persistencia: demuestra el human-in-the-loop.
+    draft = build_draft(req.opportunity_title, {"name": req.brand_name, "tone": "cercano"})
+    return set_status(draft, req.approved)
 
 
 def run() -> None:
