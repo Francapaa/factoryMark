@@ -61,7 +61,7 @@ export default function AnalyzeForm() {
               ))}
             </ul>
           </section>
-          <DraftPreview initial={mock.draft_post} />
+          <DraftPreview initial={mock.draft_post} opportunityTitle={mock.opportunities[0]?.title} />
         </div>
       )}
     </div>
