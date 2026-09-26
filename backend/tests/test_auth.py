@@ -10,7 +10,12 @@ from main import app
 
 client = TestClient(app)
 
-PAYLOAD = {"business_type": "café", "zone": "Palermo Soho"}
+PAYLOAD = {
+    "business_name": "Café Ejemplo",
+    "business_type": "café",
+    "zone": "Palermo Soho",
+    "sales_channel": "local",
+}
 
 
 @pytest.fixture(autouse=True)

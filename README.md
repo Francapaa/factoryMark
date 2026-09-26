@@ -16,8 +16,8 @@ FactoryMark automatiza ese ciclo completo: **mira → detecta → te prepara la 
 
 ## Qué hace, paso a paso
 
-1. **Investiga tu zona.** Le decís qué tipo de negocio tenés y dónde está (por ejemplo: "café de especialidad en Palermo Soho"). Busca tus competidores cercanos y sus opiniones públicas de Google.
-2. **Lee las opiniones por vos.** Analiza cientos de reseñas y agrupa de qué habla la gente: la espera, los precios, la atención, la calidad. Detecta si un lugar viene mejorando o empeorando.
+1. **Investiga tu comercio y tu zona.** Le decís el nombre de tu negocio, qué tipo es, dónde está y cómo vendés (local, online o mixto). Si es local, busca competidores cercanos en Google Maps; si es online, rastrea quién vende lo mismo en la web.
+2. **Lee las opiniones por vos.** Analiza reseñas reales de Google (y menciones web en modo online) y agrupa de qué habla la gente: la espera, los precios, la atención, la calidad.
 3. **Encuentra tu oportunidad.** Cruza toda esa información y detecta huecos concretos. Por ejemplo: "dos competidores tienen muchas quejas por la demora" o "nadie promociona el horario de la tarde".
 4. **Te escribe la publicación.** Con esa oportunidad, redacta un texto para redes con el tono y los colores de tu marca, listo para revisar.
 5. **Vos tenés la última palabra.** Nada se publica solo: la publicación queda en borrador y vos la aprobás o la rechazás con un clic.
@@ -26,11 +26,11 @@ FactoryMark automatiza ese ciclo completo: **mira → detecta → te prepara la 
 
 Estamos en etapa de **demo técnica**. Hoy el sistema ya hace esto:
 
-- ✅ Recibe tu tipo de negocio y tu zona desde una página web simple.
-- ✅ Busca competidores con datos de ejemplo y analiza reseñas de verdad con su propio sistema (sin inventar nada).
+- ✅ Recibe tu comercio (nombre obligatorio + canal: local/online/mixto) desde la página web y corre el pipeline real.
+- ✅ Busca competidores por cercanía en Google Maps (con reseñas, horarios y fotos reales si configurás la key) o en la web vía Tavily para tiendas online.
 - ✅ Detecta oportunidades con reglas claras y genera un borrador de publicación.
 - ✅ El flujo completo funciona encadenado: investigar → analizar → detectar → redactar → dejar listo para aprobar.
-- ⏳ Falta conectar los datos reales de Google y la publicación automática en Instagram (a propósito, para no gastar dinero en pruebas).
+- ⏳ Sin API keys usa datos de ejemplo (marcados como tales); la publicación automática en Instagram queda para Fase 3. Las métricas de redes (frecuencia, engagement) son Fase 2 vía Apify, pago.
 
 ## Cómo probarlo
 
@@ -52,7 +52,7 @@ pnpm install
 pnpm dev
 ```
 
-Después abrí http://localhost:3000 en tu navegador: escribí un tipo de negocio y una zona, y vas a ver competidores, oportunidades detectadas y un borrador de publicación con botones para aprobar o rechazar.
+Después abrí http://localhost:3000 en tu navegador: escribí el nombre de tu comercio, tipo de negocio, zona y canal de venta, y vas a ver competidores, oportunidades detectadas y un borrador de publicación con botones para aprobar o rechazar.
 
 ## Cómo está organizado
 

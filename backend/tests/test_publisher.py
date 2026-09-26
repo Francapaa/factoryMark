@@ -37,6 +37,7 @@ def test_approve_endpoint(monkeypatch):
 
 def test_golden_set_valido():
     cases = json.loads((Path(__file__).resolve().parents[2] / "eval" / "golden_set.json").read_text(encoding="utf-8"))
-    assert len(cases) == 5
+    assert len(cases) >= 5
     for c in cases:
-        assert {"id", "business_type", "zone", "expected_insight"} <= set(c)
+        assert {"id", "business_name", "business_type", "zone", "sales_channel", "expected_insight"} <= set(c)
+        assert c["sales_channel"] in ("local", "online", "mixto")

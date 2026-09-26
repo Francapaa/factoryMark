@@ -3,12 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
-
-type Draft = {
-  copy_text: string;
-  hashtags: string[];
-  status: string;
-};
+import type { Draft } from "@/types/analysis";
 
 export default function DraftPreview({
   initial,
