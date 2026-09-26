@@ -18,7 +18,7 @@ def _block_network(monkeypatch):
 
 def test_flujo_completo_orden_y_salida(monkeypatch):
     _block_network(monkeypatch)
-    result = run_analysis("café", "Palermo Soho")
+    result = run_analysis("Café Ejemplo", "café", "Palermo Soho", "local")
 
     assert result["trace"] == ["researcher", "analyst", "strategist", "creator", "publisher"]
     assert len(result["competitors"]) == 2
@@ -35,7 +35,7 @@ def test_flujo_completo_orden_y_salida(monkeypatch):
 
 
 def test_salida_compatible_con_contrato():
-    result = run_analysis("café", "Palermo Soho")
+    result = run_analysis("Café Ejemplo", "café", "Palermo Soho", "local")
     response = AnalyzeResponse(
         competitors=result["competitors"],
         clusters=result["clusters"],

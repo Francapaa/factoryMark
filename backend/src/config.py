@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     max_reviews_per_place: int = 20
     places_cache_ttl_hours: int = 168  # 7 días: reutilizar todo lo posible
     places_language: str = "es"
+    # Radio de búsqueda por proximidad (modo local), en metros
+    search_radius_m: int = 1000
+
+    # Tavily (señales web; primario en modo online/mixto, opcional en local)
+    tavily_api_key: str = ""
+    tavily_enabled: bool = False  # enrichment extra en modo local
+    tavily_max_queries: int = 3
+    tavily_max_results: int = 5
+    tavily_cache_ttl_hours: int = 168
 
 
 settings = Settings()

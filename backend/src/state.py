@@ -7,9 +7,21 @@ from pydantic import BaseModel, Field
 
 
 class AnalyzeRequest(BaseModel):
-    business_type: str = Field(examples=["café de especialidad"])
-    zone: str = Field(examples=["Palermo Soho, Buenos Aires"])
+    business_name: str = Field(min_length=1, examples=["Café Martínez"])
+    business_type: str = Field(min_length=1, examples=["café de especialidad"])
+    zone: str = Field(min_length=1, examples=["Palermo Soho, Buenos Aires"])
+    sales_channel: Literal["local", "online", "mixto"] = "local"
     language: str = "es"
+
+
+class Anchor(BaseModel):
+    """Comercio específico que pide el análisis (resuelto en Maps)."""
+
+    place_id: str
+    name: str
+    address: str = ""
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class Competitor(BaseModel):
@@ -19,6 +31,24 @@ class Competitor(BaseModel):
     user_ratings_total: int = 0
     address: str = ""
     cached: bool = False  # True si vino de cache (ahorro de cuota)
+    source: Literal["maps", "web"] = "maps"
+    distance_m: float | None = None  # solo modo local
+    opening_hours: list[str] = []
+    photos: list[str] = []  # photo references (máx 3)
+    website: str = ""
+    reviews_fetched: int = 0
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+class WebSignal(BaseModel):
+    """Evidencia web (Tavily): links + snippets, nunca métricas de redes."""
+
+    url: str
+    title: str = ""
+    snippet: str = ""
+    published_date: str = ""
+    query: str = ""
 
 
 class ReviewCluster(BaseModel):

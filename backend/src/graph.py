@@ -35,7 +35,17 @@ def build_graph():
 graph = build_graph()
 
 
-def run_analysis(business_type: str, zone: str) -> dict:
-    result = graph.invoke({"business_type": business_type, "zone": zone})
-    result["meta"] = {"stub": True, "trace": result.get("trace", [])}
+def run_analysis(business_name: str, business_type: str, zone: str, sales_channel: str = "local") -> dict:
+    result = graph.invoke(
+        {
+            "business_name": business_name,
+            "business_type": business_type,
+            "zone": zone,
+            "sales_channel": sales_channel,
+        }
+    )
+    meta = result.get("meta") or {}
+    meta.setdefault("stub", True)
+    meta["trace"] = result.get("trace", [])
+    result["meta"] = meta
     return result

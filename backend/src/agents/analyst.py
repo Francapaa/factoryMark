@@ -8,6 +8,7 @@ from nlp.scoring import competitive_score
 
 def analyst_node(state: dict) -> dict:
     reviews_by_place: dict[str, list[str]] = state.get("reviews_by_place", {})
+    last_by_place: dict[str, str] = state.get("last_review_by_place", {})
     all_texts = [t for texts in reviews_by_place.values() for t in texts]
     clusters = [c.model_dump() for c in cluster_reviews(all_texts)]
 
@@ -16,7 +17,7 @@ def analyst_node(state: dict) -> dict:
         scores[comp["place_id"]] = competitive_score(
             comp.get("rating"),
             comp.get("user_ratings_total", 0),
-            None,
+            last_by_place.get(comp["place_id"]),
             0.0,
         )
     return {"clusters": clusters, "scores": scores, "trace": ["analyst"]}

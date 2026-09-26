@@ -1,7 +1,8 @@
 [
-  {"id": "caso-01", "business_type": "café de especialidad", "zone": "Palermo Soho, Buenos Aires", "expected_insight": "competidores flojos en horario de tarde", "min_competitors": 3},
-  {"id": "caso-02", "business_type": "pizzería", "zone": "Caballito, Buenos Aires", "expected_insight": "quejas recurrentes por demora en delivery", "min_competitors": 3},
-  {"id": "caso-03", "business_type": "barbería", "zone": "Villa Crespo, Buenos Aires", "expected_insight": "nadie ofrece reserva online", "min_competitors": 2},
-  {"id": "caso-04", "business_type": "panadería", "zone": "Belgrano, Buenos Aires", "expected_insight": "elogios a masa madre que podemos replicar", "min_competitors": 2},
-  {"id": "caso-05", "business_type": "restaurante vegano", "zone": "Colegiales, Buenos Aires", "expected_insight": "precios altos como oportunidad de entrada", "min_competitors": 2}
+  {"id": "caso-01", "business_name": "Café de Especialidad Ejemplo", "business_type": "café de especialidad", "zone": "Palermo Soho, Buenos Aires", "sales_channel": "local", "expected_insight": "competidores flojos en horario de tarde", "min_competitors": 3},
+  {"id": "caso-02", "business_name": "Pizzería Ejemplo", "business_type": "pizzería", "zone": "Caballito, Buenos Aires", "sales_channel": "local", "expected_insight": "quejas recurrentes por demora en delivery", "min_competitors": 3},
+  {"id": "caso-03", "business_name": "Barbería Ejemplo", "business_type": "barbería", "zone": "Villa Crespo, Buenos Aires", "sales_channel": "local", "expected_insight": "nadie ofrece reserva online", "min_competitors": 2},
+  {"id": "caso-04", "business_name": "Panadería Ejemplo", "business_type": "panadería", "zone": "Belgrano, Buenos Aires", "sales_channel": "mixto", "expected_insight": "elogios a masa madre que podemos replicar", "min_competitors": 2},
+  {"id": "caso-05", "business_name": "Restaurante Vegano Ejemplo", "business_type": "restaurante vegano", "zone": "Colegiales, Buenos Aires", "sales_channel": "local", "expected_insight": "precios altos como oportunidad de entrada", "min_competitors": 2},
+  {"id": "caso-06", "business_name": "Tienda de Café Online", "business_type": "café de especialidad en grano", "zone": "Argentina", "sales_channel": "online", "expected_insight": "competidores online con envío y precios publicados", "min_competitors": 2}
 ]
