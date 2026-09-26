@@ -36,7 +36,7 @@ export default function GoogleSignInButton({ disabled = false }: { disabled?: bo
     try {
       const res = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: "/app",
       });
       if (res?.error) {
         setError("No se pudo iniciar sesión con Google. Probá de nuevo.");
