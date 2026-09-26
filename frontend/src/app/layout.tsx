@@ -1,30 +1,33 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Inter } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const display = Space_Grotesk({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const body = Inter({
+  variable: "--font-body",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "FactoryMark · Inteligencia competitiva para tu negocio",
+  title: "FactoryMark · Tu espía legal de la competencia",
   description:
-    "FactoryMark investiga tu competencia, detecta oportunidades y te prepara la publicación. Ingreso solo con Google.",
+    "Investigamos tu competencia local, detectamos oportunidades reales en reviews y te dejamos el post listo para publicar. Para cafés, barberías y pizzerías de barrio.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${display.variable} ${body.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col bg-[#0A0A0B] text-zinc-100">
+        {children}
+      </body>
     </html>
   );
 }

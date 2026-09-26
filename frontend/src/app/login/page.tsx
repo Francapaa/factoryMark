@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import GoogleSignInButton from "@/components/GoogleSignInButton";
 import { getAuth } from "@/lib/auth/server";
 
@@ -8,7 +9,7 @@ export default async function LoginPage() {
   let configured = true;
   try {
     const { data: session } = await getAuth().getSession();
-    if (session?.user) redirect("/");
+    if (session?.user) redirect("/app");
   } catch {
     configured = false;
   }
@@ -27,10 +28,18 @@ export default async function LoginPage() {
           Si es tu primera vez, la cuenta se crea sola: no hay formularios ni contraseñas.
         </p>
         {!configured ? (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
-            Falta configurar Neon Auth en el servidor (variables{" "}
-            <code>NEON_AUTH_BASE_URL</code> y <code>NEON_AUTH_COOKIE_SECRET</code>).
-            Ver <code>frontend/.env.local.example</code>.
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-sm text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-400">
+              El login con Google aún no está configurado en este entorno (faltan{" "}
+              <code>NEON_AUTH_BASE_URL</code> y <code>NEON_AUTH_COOKIE_SECRET</code>).
+              Mientras tanto podés explorar la landing y la demo.
+            </div>
+            <Link
+              href="/#demo"
+              className="rounded-lg bg-black px-5 py-3 text-center font-medium text-white dark:bg-white dark:text-black"
+            >
+              Ver la demo
+            </Link>
           </div>
         ) : (
           <GoogleSignInButton />
