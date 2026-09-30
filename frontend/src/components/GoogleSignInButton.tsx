@@ -36,12 +36,13 @@ export default function GoogleSignInButton({ disabled = false }: { disabled?: bo
     try {
       // URLs absolutas: el servicio managed redirige a callbackURL (existentes)
       // y a newUserCallbackURL (primer ingreso). Relativas defaultean a `/`
-      // dejando el verifier colgado y sin llegar al dashboard.
-      const dashboardUrl = `${window.location.origin}/dashboard`;
+      // dejando el verifier colgado. El destino es /onboarding: el dashboard
+      // exige negocio guardado y el gate lo redirigiría igual.
+      const onboardingUrl = `${window.location.origin}/onboarding`;
       const res = await authClient.signIn.social({
         provider: "google",
-        callbackURL: dashboardUrl,
-        newUserCallbackURL: dashboardUrl,
+        callbackURL: onboardingUrl,
+        newUserCallbackURL: onboardingUrl,
       });
       if (res?.error) {
         setError("No se pudo iniciar sesión con Google. Probá de nuevo.");

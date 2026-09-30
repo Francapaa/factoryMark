@@ -2,14 +2,15 @@
 
 import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { BusinessMine } from "@/types/dashboard";
+import type { MyBusiness } from "@/lib/businesses";
+import { snapshotOf } from "@/types/dashboard";
 import { EmptyState } from "./SectionCard";
 
 export function BusinessSummary({
   business,
   loading,
 }: {
-  business: BusinessMine | null;
+  business: MyBusiness | null;
   loading: boolean;
 }) {
   if (loading) {
@@ -37,7 +38,7 @@ export function BusinessSummary({
     );
   }
 
-  const snap = business.anchor_snapshot;
+  const snap = snapshotOf(business);
   return (
     <div className="rounded-2xl border border-white/10 bg-black/50 p-5">
       <div className="flex flex-wrap items-center gap-2">

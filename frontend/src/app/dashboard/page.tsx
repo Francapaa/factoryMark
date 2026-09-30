@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import AnalyzeForm from "@/components/AnalyzeForm";
-import { BusinessGate } from "./components";
-import UserMenu from "@/components/UserMenu";
+import { DashboardClient } from "@/components/dashboard/DashboardClient";
 import { getAuth } from "@/lib/auth/server";
+import { BusinessGate } from "./components";
 
 export const dynamic = "force-dynamic";
 
@@ -16,5 +15,9 @@ export default async function DashboardPage() {
   }
   if (!user) redirect("/login");
 
-  return <DashboardClient />;
+  return (
+    <BusinessGate>
+      <DashboardClient />
+    </BusinessGate>
+  );
 }
