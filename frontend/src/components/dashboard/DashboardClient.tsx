@@ -4,11 +4,11 @@ import { useCallback, useEffect, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import { Flame } from "lucide-react";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
+import { getMyBusiness } from "@/lib/businesses";
 import {
   dashboardReducer,
   initialDashboardState,
   type AnalyzeResultWithScore,
-  type BusinessMine,
   type DashboardPost,
   type IGProfile,
 } from "@/types/dashboard";
@@ -44,17 +44,14 @@ export function DashboardClient() {
     void (async () => {
       dispatch({ type: "business/loading" });
       try {
-        const res = await apiFetch("/api/businesses/mine");
+        // Fuente única: lib/businesses (el BusinessGate ya redirige si es null).
+        const mine = await getMyBusiness();
         if (cancelled) return;
-        if (res.status === 404) {
+        if (mine === null) {
           dispatch({ type: "business/missing" });
           return;
         }
-        if (!res.ok) throw new Error(`Error ${res.status}`);
-        dispatch({
-          type: "business/loaded",
-          business: (await res.json()) as BusinessMine,
-        });
+        dispatch({ type: "business/loaded", business: mine });
       } catch (e) {
         if (cancelled) return;
         if (e instanceof AuthRequiredError) {

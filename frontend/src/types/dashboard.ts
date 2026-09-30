@@ -5,24 +5,23 @@
  */
 
 import type { AnalyzeResult, Competitor, Opportunity } from "./analysis";
+import type { MyBusiness } from "@/lib/businesses";
 
-export type BusinessMine = {
-  id: string;
-  name: string;
-  business_type: string;
-  sales_channel: "local" | "online" | "mixto";
-  zone: string;
-  anchor_place_id: string;
-  anchor_snapshot: {
-    address: string;
-    lat: number | null;
-    lng: number | null;
-    rating: number | null;
-    photo_ref?: string;
-    resolved_at?: string;
-  };
-  brand_kit?: Record<string, unknown> | null;
+/** Snapshot del ancla con tipos estrechos (el contrato trae Record<string, unknown>). */
+export type AnchorSnapshotView = {
+  address: string;
+  rating: number | null;
 };
+
+export function snapshotOf(business: MyBusiness): AnchorSnapshotView {
+  const snap = business.anchor_snapshot ?? {};
+  const address = snap["address"];
+  const rating = snap["rating"];
+  return {
+    address: typeof address === "string" ? address : "",
+    rating: typeof rating === "number" ? rating : null,
+  };
+}
 
 export type CompetitorWithScore = Competitor & {
   score?: number | null;
@@ -66,7 +65,7 @@ export type DashboardPost = {
 };
 
 export type DashboardState = {
-  business: BusinessMine | null;
+  business: MyBusiness | null;
   businessLoading: boolean;
   businessMissing: boolean;
   comp: CompetitorsState;
@@ -78,7 +77,7 @@ export type DashboardState = {
 
 export type DashboardAction =
   | { type: "business/loading" }
-  | { type: "business/loaded"; business: BusinessMine }
+  | { type: "business/loaded"; business: MyBusiness }
   | { type: "business/missing" }
   | { type: "business/error" }
   | { type: "comp/set"; state: CompetitorsState }

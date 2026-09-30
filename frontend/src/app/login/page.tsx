@@ -9,7 +9,7 @@ export default async function LoginPage() {
   let configured = true;
   try {
     const { data: session } = await getAuth().getSession();
-    if (session?.user) redirect("/dashboard");
+    if (session?.user) redirect("/onboarding");
   } catch {
     configured = false;
   }
