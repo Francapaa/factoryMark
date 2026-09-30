@@ -38,5 +38,11 @@ class Settings(BaseSettings):
     tavily_max_results: int = 5
     tavily_cache_ttl_hours: int = 168
 
+    # Instagram-Login v1 (conectar + leer perfil; publicar = milestone post-App-Review)
+    instagram_client_id: str = ""
+    instagram_client_secret: str = ""
+    instagram_redirect_uri: str = ""
+    token_encryption_key: str = ""  # Fernet; persistencia cifrada con tabla de negocios
+
 
 settings = Settings()
