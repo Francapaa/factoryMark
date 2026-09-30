@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     # Solo desarrollo local sin Neon: saltea la verificación (nunca en prod)
     auth_disabled: bool = False
 
+    # Neon Postgres (negocio del dueño, ver backend/schema.sql)
+    database_url: str = ""
+
     # Límites para no quemar cuota de Google Places
     max_competitors: int = 10
     max_reviews_per_place: int = 20

@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation";
-import { DashboardClient } from "@/components/dashboard/DashboardClient";
+import AnalyzeForm from "@/components/AnalyzeForm";
+import { BusinessGate } from "./components";
+import UserMenu from "@/components/UserMenu";
 import { getAuth } from "@/lib/auth/server";
 
 export const dynamic = "force-dynamic";

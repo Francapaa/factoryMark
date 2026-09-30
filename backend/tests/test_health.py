@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+import db
 from config import settings
 from main import app
 
@@ -14,6 +15,23 @@ def test_health_ok():
 
 def test_analyze_stub_does_not_call_external_apis(monkeypatch):
     monkeypatch.setattr(settings, "auth_disabled", True)
+    monkeypatch.setattr(
+        db,
+        "get_my_business",
+        lambda owner_id: {
+            "id": "b1",
+            "owner_id": owner_id,
+            "name": "Café Ejemplo",
+            "business_type": "café",
+            "sales_channel": "local",
+            "zone": "Palermo Soho",
+            "anchor_place_id": "anchor1",
+            "anchor_snapshot": {},
+            "brand_kit": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+    )
     r = client.post(
         "/api/analyze",
         json={

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter } from "next/font/google";
+import type { ReactNode } from "react";
 import "./globals.css";
 
 const display = Space_Grotesk({
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
     "Investigamos tu competencia local, detectamos oportunidades reales en reviews y te dejamos el post listo para publicar. Para cafés, barberías y pizzerías de barrio.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="es"

@@ -6,7 +6,7 @@ let cached: ((request: NextRequest) => Promise<NextResponse>) | null = null;
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  // Públicas: landing y login (+ callback de OAuth). Solo /app exige sesión.
+  // Públicas: landing y login (+ callback de OAuth). Solo /dashboard exige sesión.
   if (pathname === "/" || pathname === "/login") return NextResponse.next();
   try {
     cached ??= getAuth().middleware({ loginUrl: "/login" });

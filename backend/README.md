@@ -8,7 +8,7 @@ Agente de Inteligencia Competitiva — FastAPI.
 cd backend
 uv sync
 uv run pytest
-uv run uvicorn main:app --app-dir src --reload
+uv run dev.py   # dev server con reload en 127.0.0.1:8000 (ver dev.py)
 ```
 
 - `GET /health` → estado + keys configuradas + límites de cuota.
