@@ -1,37 +1,40 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import { Flame } from "lucide-react";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
-import type {
-  AnalyzeResultWithScore,
-  BusinessMine,
-  DashboardPost,
-  IGProfile,
+import {
+  dashboardReducer,
+  initialDashboardState,
+  type AnalyzeResultWithScore,
+  type BusinessMine,
+  type DashboardPost,
+  type IGProfile,
 } from "@/types/dashboard";
 import { BusinessSummary } from "./BusinessSummary";
-import { CompetitorsSection, type CompetitorsState } from "./CompetitorsSection";
+import { CompetitorsSection } from "./CompetitorsSection";
 import {
   OpportunitiesSection,
   PublicationsSection,
   StudioEntry,
 } from "./ContentSections";
-import { InstagramCard, type IGState } from "./InstagramCard";
+import { InstagramCard } from "./InstagramCard";
 import { SectionCard } from "./SectionCard";
 
 export function DashboardClient() {
   const router = useRouter();
-  const [business, setBusiness] = useState<BusinessMine | null>(null);
-  const [businessLoading, setBusinessLoading] = useState(true);
-  const [businessMissing, setBusinessMissing] = useState(false);
-
-  const [compState, setCompState] = useState<CompetitorsState>({ status: "idle" });
-  const [opportunities, setOpportunities] = useState<AnalyzeResultWithScore["opportunities"]>([]);
-  const [draft, setDraft] = useState<DashboardPost | null>(null);
-  const [searched, setSearched] = useState(false);
-
-  const [ig, setIg] = useState<IGState>({ status: "loading" });
+  const [state, dispatch] = useReducer(dashboardReducer, initialDashboardState);
+  const {
+    business,
+    businessLoading,
+    businessMissing,
+    comp,
+    opportunities,
+    draft,
+    searched,
+    ig,
+  } = state;
 
   const goLogin = useCallback(() => router.push("/login"), [router]);
 
@@ -39,28 +42,26 @@ export function DashboardClient() {
     let cancelled = false;
 
     void (async () => {
-      setBusinessLoading(true);
+      dispatch({ type: "business/loading" });
       try {
         const res = await apiFetch("/api/businesses/mine");
         if (cancelled) return;
         if (res.status === 404) {
-          setBusiness(null);
-          setBusinessMissing(true);
+          dispatch({ type: "business/missing" });
           return;
         }
         if (!res.ok) throw new Error(`Error ${res.status}`);
-        setBusiness((await res.json()) as BusinessMine);
-        setBusinessMissing(false);
+        dispatch({
+          type: "business/loaded",
+          business: (await res.json()) as BusinessMine,
+        });
       } catch (e) {
         if (cancelled) return;
         if (e instanceof AuthRequiredError) {
           router.push("/login");
           return;
         }
-        setBusiness(null);
-        setBusinessMissing(false);
-      } finally {
-        if (!cancelled) setBusinessLoading(false);
+        dispatch({ type: "business/error" });
       }
     })();
 
@@ -69,7 +70,7 @@ export function DashboardClient() {
         const res = await apiFetch("/api/instagram/status");
         if (cancelled) return;
         if (!res.ok) {
-          setIg({ status: "desconectado" });
+          dispatch({ type: "ig/set", state: { status: "desconectado" } });
           return;
         }
         const body = (await res.json()) as {
@@ -84,11 +85,14 @@ export function DashboardClient() {
             followers_count: body.followers_count,
             media_count: body.media_count,
           };
-          setIg({ status: "conectado", profile });
+          dispatch({ type: "ig/set", state: { status: "conectado", profile } });
         } else if (body.estado === "expirado") {
-          setIg({ status: "expirado", username: body.username });
+          dispatch({
+            type: "ig/set",
+            state: { status: "expirado", username: body.username },
+          });
         } else {
-          setIg({ status: "desconectado" });
+          dispatch({ type: "ig/set", state: { status: "desconectado" } });
         }
       } catch (e) {
         if (cancelled) return;
@@ -96,7 +100,7 @@ export function DashboardClient() {
           router.push("/login");
           return;
         }
-        setIg({ status: "desconectado" });
+        dispatch({ type: "ig/set", state: { status: "desconectado" } });
       }
     })();
 
@@ -107,7 +111,7 @@ export function DashboardClient() {
 
   const search = useCallback(async () => {
     if (!business) return;
-    setCompState({ status: "loading" });
+    dispatch({ type: "comp/set", state: { status: "loading" } });
     try {
       const res = await apiFetch("/api/analyze", {
         method: "POST",
@@ -120,17 +124,24 @@ export function DashboardClient() {
         }),
       });
       if (res.status === 404) {
-        setCompState({
-          status: "error",
-          message:
-            "No encontramos tu negocio en Maps con esos datos. Verificá el nombre en el onboarding.",
+        dispatch({
+          type: "comp/set",
+          state: {
+            status: "error",
+            message:
+              "No encontramos tu negocio en Maps con esos datos. Verificá el nombre en el onboarding.",
+          },
         });
         return;
       }
       if (res.status === 409) {
-        setCompState({
-          status: "error",
-          message: "Completá tu onboarding antes de analizar: tu negocio aún no está guardado.",
+        dispatch({
+          type: "comp/set",
+          state: {
+            status: "error",
+            message:
+              "Completá tu onboarding antes de analizar: tu negocio aún no está guardado.",
+          },
         });
         return;
       }
@@ -141,37 +152,45 @@ export function DashboardClient() {
         throw new Error(detail);
       }
       const result = (await res.json()) as AnalyzeResultWithScore;
-      const sorted = [...result.competitors].sort((a, b) => {
+      const competitors = [...result.competitors].sort((a, b) => {
         if (a.score != null && b.score != null) return b.score - a.score;
         if (a.score != null) return -1;
         if (b.score != null) return 1;
         if (a.distance_m != null && b.distance_m != null) return a.distance_m - b.distance_m;
         return 0;
       });
-      setCompState({ status: "done", competitors: sorted });
-      setOpportunities(result.opportunities);
-      setDraft(
-        result.draft_post
-          ? {
-              id: "draft-actual",
-              state: "borrador",
-              copy_text: result.draft_post.copy_text,
-              hashtags: result.draft_post.hashtags,
-            }
-          : null
-      );
-      setSearched(true);
+      const nextDraft: DashboardPost | null = result.draft_post
+        ? {
+            id: "draft-actual",
+            state: "borrador",
+            copy_text: result.draft_post.copy_text,
+            hashtags: result.draft_post.hashtags,
+          }
+        : null;
+      dispatch({
+        type: "analysis/success",
+        competitors,
+        opportunities: result.opportunities,
+        draft: nextDraft,
+      });
     } catch (e) {
       if (e instanceof AuthRequiredError) {
         router.push("/login");
         return;
       }
-      setCompState({
-        status: "error",
-        message: e instanceof Error ? e.message : "Falló el análisis de tu zona",
+      dispatch({
+        type: "comp/set",
+        state: {
+          status: "error",
+          message: e instanceof Error ? e.message : "Falló el análisis de tu zona",
+        },
       });
     }
   }, [business, router]);
+
+  function setIg(next: typeof ig) {
+    dispatch({ type: "ig/set", state: next });
+  }
 
   return (
     <div className="relative min-h-screen bg-[#0A0A0B]">
@@ -229,7 +248,7 @@ export function DashboardClient() {
               Guardá tu negocio primero para buscar competidores en tu zona.
             </p>
           ) : (
-            <CompetitorsSection state={compState} onSearch={search} />
+            <CompetitorsSection state={comp} onSearch={search} />
           )}
         </SectionCard>
 

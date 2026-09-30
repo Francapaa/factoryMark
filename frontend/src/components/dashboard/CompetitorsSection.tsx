@@ -2,15 +2,9 @@
 
 import { ArrowRight, Loader2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { CompetitorWithScore } from "@/types/dashboard";
+import type { CompetitorsState, CompetitorWithScore } from "@/types/dashboard";
 import { mapsUrl } from "@/types/dashboard";
 import { EmptyState, ErrorState } from "./SectionCard";
-
-export type CompetitorsState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "done"; competitors: CompetitorWithScore[] }
-  | { status: "error"; message: string };
 
 function distanceLabel(c: CompetitorWithScore): string {
   if (c.distance_m != null) return `${Math.round(c.distance_m)} m`;

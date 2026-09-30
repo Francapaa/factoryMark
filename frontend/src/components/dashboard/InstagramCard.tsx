@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
-import type { IGProfile, IGStatus } from "@/types/dashboard";
+import type { IGState } from "@/types/dashboard";
 import { ErrorState } from "./SectionCard";
 
 /** Glifo estilo Instagram en SVG propio (lucide deprecó los brand icons). */
@@ -27,13 +27,6 @@ function InstagramGlyph({ className }: { className?: string }) {
     </svg>
   );
 }
-
-export type IGState =
-  | { status: "loading" }
-  | { status: "desconectado" }
-  | { status: "conectado"; profile: IGProfile }
-  | { status: "expirado"; username?: string }
-  | { status: "error"; message: string };
 
 export function InstagramCard({
   state,
@@ -187,10 +180,4 @@ export function InstagramCard({
       )}
     </div>
   );
-}
-
-export function igStatusOf(api: string): IGStatus {
-  if (api === "conectado") return "conectado";
-  if (api === "expirado") return "expirado";
-  return "desconectado";
 }
