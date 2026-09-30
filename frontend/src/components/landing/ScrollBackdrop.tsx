@@ -4,22 +4,23 @@ import { motion, useScroll, useTransform } from "framer-motion";
 
 /**
  * Fondo global que cambia de color con el scroll:
- * negro → brasa → negro → ÁMBAR CLARO (casos de éxito) → negro cierre.
+ * negro → brasa → negro → pico ámbar quemado (solo casos) → brasa → negro cierre.
+ * Sin tramos claros: testimonios y FAQ quedan siempre sobre oscuro.
  */
 export function ScrollBackdrop() {
   const { scrollYProgress } = useScroll();
 
   const background = useTransform(
     scrollYProgress,
-    [0, 0.16, 0.34, 0.52, 0.64, 0.78, 0.9, 1],
+    [0, 0.16, 0.34, 0.52, 0.6, 0.7, 0.82, 1],
     [
       "#0A0A0B", // hero
       "#170C05", // problema: brasa
       "#0A0A0B", // pipeline
-      "#1A0E04", // demo: marrón quemado
-      "#F59E0B", // casos: entra ámbar
-      "#FDE9C8", // casos: ámbar claro pleno
-      "#140B06", // testimonios: vuelta a brasa
+      "#241203", // demo: marrón quemado
+      "#B45309", // casos: pico ámbar quemado, breve
+      "#170C05", // testimonios: de vuelta a brasa oscura
+      "#0A0A0B", // faq: negro
       "#0A0A0B", // cierre negro
     ]
   );
