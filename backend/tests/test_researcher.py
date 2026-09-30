@@ -3,6 +3,7 @@
 import httpx
 import pytest
 
+import db
 from agents.researcher import haversine_m, researcher_node
 from tools import places
 from tools import tavily as tavily_mod
@@ -164,6 +165,26 @@ def test_endpoint_404_cuando_ancla_no_existe(monkeypatch, tmp_path):
 
     monkeypatch.setattr(settings, "auth_disabled", True)
     _mock_net(monkeypatch, tmp_path, _make_handler(anchor_places=[]))
+
+    # El gate exige onboarding: el negocio guardado coincide con el payload
+    # para que el run llegue a resolver el ancla (y falle 404).
+    monkeypatch.setattr(
+        db,
+        "get_my_business",
+        lambda owner_id: {
+            "id": "b1",
+            "owner_id": owner_id,
+            "name": "No Existe",
+            "business_type": "café",
+            "sales_channel": "local",
+            "zone": "Palermo",
+            "anchor_place_id": "anchor-x",
+            "anchor_snapshot": {},
+            "brand_kit": None,
+            "created_at": None,
+            "updated_at": None,
+        },
+    )
     r = TestClient(app).post(
         "/api/analyze",
         json={

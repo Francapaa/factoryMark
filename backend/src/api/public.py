@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 from config import settings
+from db import is_db_configured
 
 router = APIRouter(tags=["public"])
 
@@ -17,6 +18,7 @@ def health() -> dict:
         "tavily_enabled_local": settings.tavily_enabled,
         "auth_configured": bool(settings.neon_auth_base_url),
         "auth_disabled": settings.auth_disabled,
+        "db_configured": is_db_configured(),
         "limits": {
             "max_competitors": settings.max_competitors,
             "max_reviews_per_place": settings.max_reviews_per_place,

@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import auth
+import db
 from auth import CurrentUser, get_jwks_url, verify_neon_jwt
 from config import settings
 from main import app
@@ -16,6 +17,24 @@ PAYLOAD = {
     "zone": "Palermo Soho",
     "sales_channel": "local",
 }
+
+
+def _saved(owner_id: str, **overrides) -> dict:
+    saved = {
+        "id": "b1",
+        "owner_id": owner_id,
+        "name": "Café Ejemplo",
+        "business_type": "café",
+        "sales_channel": "local",
+        "zone": "Palermo Soho",
+        "anchor_place_id": "anchor1",
+        "anchor_snapshot": {},
+        "brand_kit": None,
+        "created_at": None,
+        "updated_at": None,
+    }
+    saved.update(overrides)
+    return saved
 
 
 @pytest.fixture(autouse=True)
@@ -53,6 +72,7 @@ def test_sin_base_url_da_503(monkeypatch):
 
 def test_auth_disabled_permite_pasar(monkeypatch):
     monkeypatch.setattr(settings, "auth_disabled", True)
+    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
     r = client.post("/api/analyze", json=PAYLOAD)
     assert r.status_code == 200
     assert r.json()["meta"]["user_id"] == "dev-user"
@@ -66,6 +86,7 @@ def test_usuario_mockeado_llega_al_endpoint(monkeypatch):
     from main import app as _app
 
     _app.dependency_overrides[auth.get_current_user] = _fake_dep
+    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
     try:
         r = client.post("/api/analyze", json=PAYLOAD)
         assert r.status_code == 200

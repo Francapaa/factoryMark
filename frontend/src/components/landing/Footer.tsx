@@ -21,7 +21,7 @@ export function Footer() {
           <a href="#casos" className="hover:text-[#FFB25C]">Casos</a>
           <a href="#faq" className="hover:text-[#FFB25C]">FAQ</a>
           <a href="/login" className="hover:text-[#FFB25C]">Entrar</a>
-          <a href="/app" className="hover:text-[#FFB25C]">Dashboard</a>
+          <a href="/dashboard" className="hover:text-[#FFB25C]">Dashboard</a>
         </nav>
         <p className="text-xs text-zinc-600">© 2026 FactoryMark · Hecho en Buenos Aires</p>
       </div>

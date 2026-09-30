@@ -1,8 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
+import Link from "next/link";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
+import { apiErrorCode, apiErrorMessage, getMyBusiness } from "@/lib/businesses";
 import {
   analyzeFormReducer,
   initialAnalyzeFormState,
@@ -18,6 +20,25 @@ export default function AnalyzeForm() {
   const router = useRouter();
   const [state, dispatch] = useReducer(analyzeFormReducer, initialAnalyzeFormState);
   const { businessName, businessType, zone, salesChannel, status, error, result } = state;
+  const [savedName, setSavedName] = useState<string | null>(null);
+
+  // El análisis corre sobre el negocio guardado: precarga sin retipear.
+  useEffect(() => {
+    let alive = true;
+    getMyBusiness()
+      .then((b) => {
+        if (!b || !alive) return;
+        setSavedName(b.name);
+        dispatch({ type: "setField", field: "businessName", value: b.name });
+        if (b.business_type) dispatch({ type: "setField", field: "businessType", value: b.business_type });
+        if (b.zone) dispatch({ type: "setField", field: "zone", value: b.zone });
+        dispatch({ type: "setField", field: "salesChannel", value: b.sales_channel });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function setField(field: "businessName" | "businessType" | "zone" | "salesChannel") {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
@@ -39,10 +60,12 @@ export default function AnalyzeForm() {
         }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { detail?: unknown } | null;
-        const detail =
-          typeof body?.detail === "string" ? body.detail : `Error ${res.status}`;
-        throw new Error(detail);
+        const body = (await res.json().catch(() => null)) as unknown;
+        if (res.status === 409 && apiErrorCode(body) === "onboarding_incompleto") {
+          router.push("/onboarding");
+          return;
+        }
+        throw new Error(apiErrorMessage(body, `Error ${res.status}`));
       }
       dispatch({ type: "success", result: (await res.json()) as AnalyzeResult });
     } catch (err) {
@@ -59,6 +82,15 @@ export default function AnalyzeForm() {
 
   return (
     <div className="flex flex-col gap-6">
+      {savedName && (
+        <p className="text-sm text-zinc-500">
+          Analizando como <span className="font-medium text-black dark:text-zinc-50">{savedName}</span>{" "}
+          ·{" "}
+          <Link href="/onboarding" className="underline">
+            cambiar de local
+          </Link>
+        </p>
+      )}
       <form onSubmit={onSubmit} className="flex flex-col gap-3">
         <div className="flex flex-col gap-3 sm:flex-row">
           <input

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import AnalyzeForm from "@/components/AnalyzeForm";
+import { BusinessGate } from "./components";
 import UserMenu from "@/components/UserMenu";
 import { getAuth } from "@/lib/auth/server";
 
@@ -16,7 +17,7 @@ async function getHealth() {
   }
 }
 
-export default async function AppDashboard() {
+export default async function DashboardPage() {
   let user: { name?: string | null; email?: string | null; image?: string | null } | null = null;
   try {
     const { data: session } = await getAuth().getSession();
@@ -51,7 +52,9 @@ export default async function AppDashboard() {
               : "Levantá el backend con `cd backend && uv run uvicorn factorymark.main:app --reload`, o usá el modo mock."}
           </p>
         </div>
-        <AnalyzeForm />
+        <BusinessGate>
+          <AnalyzeForm />
+        </BusinessGate>
       </main>
     </div>
   );

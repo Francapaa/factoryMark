@@ -326,6 +326,8 @@ def _normalize_details(place_id: str, data: dict) -> dict:
     ]
     return {
         "place_id": place_id,
+        "rating": data.get("rating"),
+        "user_ratings_total": int(data.get("userRatingCount", 0) or 0),
         "reviews": reviews[: settings.max_reviews_per_place],
         "opening_hours": [str(h) for h in hours],
         "photos": photos,

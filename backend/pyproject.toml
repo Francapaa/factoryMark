@@ -15,6 +15,7 @@ dependencies = [
     "scikit-learn>=1.9.1",
     "tenacity",
     "uvicorn[standard]",
+    "psycopg[binary]>=3.3.6",
 ]
 
 [tool.uv]
