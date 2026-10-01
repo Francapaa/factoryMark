@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     tavily_max_results: int = 5
     tavily_cache_ttl_hours: int = 168
 
+    # CORS: orígenes del frontend separados por coma (localhost + 127.0.0.1:
+    # el browser los trata como orígenes distintos y el preflight falla si
+    # falta el que estés usando en la barra de direcciones).
+    frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
     # Instagram-Login v1 (conectar + leer perfil; publicar = milestone post-App-Review)
     instagram_client_id: str = ""
     instagram_client_secret: str = ""
