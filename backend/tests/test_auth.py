@@ -1,5 +1,8 @@
 """Tests de autenticación (Neon Auth, solo Google). Sin llamadas de red."""
 
+import time
+from types import SimpleNamespace
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -104,3 +107,69 @@ def test_jwks_url_se_deriva_del_base(monkeypatch):
 def test_jwks_url_override(monkeypatch):
     monkeypatch.setattr(settings, "neon_auth_jwks_url", "https://otro/jwks.json")
     assert get_jwks_url() == "https://otro/jwks.json"
+
+
+class _FakeJwksClient:
+    """JWKS local: devuelve la pública Ed25519 sin red (el JWT es real, firmado acá)."""
+
+    def __init__(self, public_key):
+        self._public_key = public_key
+
+    def get_signing_key_from_jwt(self, token):
+        return SimpleNamespace(key=self._public_key)
+
+
+def _jwt_real(monkeypatch, iss, sub="user-1", exp_in=600, base_url=None):
+    import jwt as pyjwt
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    private_key = Ed25519PrivateKey.generate()
+    monkeypatch.setattr(settings, "neon_auth_base_url", base_url or iss)
+    monkeypatch.setitem(auth._jwks_clients, get_jwks_url(), _FakeJwksClient(private_key.public_key()))
+    now = int(time.time())
+    return pyjwt.encode(
+        {"iss": iss, "sub": sub, "exp": now + exp_in, "iat": now},
+        private_key,
+        algorithm="EdDSA",
+    )
+
+
+def test_jwt_real_pasa_el_gate_y_llega_al_endpoint(monkeypatch):
+    iss = "https://auth.test.neon.tech"
+    token = _jwt_real(monkeypatch, iss)
+    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
+    r = client.get("/api/businesses/mine", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200
+    assert r.json()["owner_id"] == "user-1"
+
+
+def test_jwt_de_otro_emisor_da_401(monkeypatch):
+    token = _jwt_real(
+        monkeypatch, "https://otro-emisor.test", base_url="https://auth.test.neon.tech"
+    )
+
+    def _no_db(owner_id):
+        raise AssertionError("el gate debe rechazar antes de tocar la DB")
+
+    monkeypatch.setattr(db, "get_my_business", _no_db)
+    r = client.get("/api/businesses/mine", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+    assert r.json()["detail"] == "Token de otro emisor"
+
+
+def test_jwt_expirado_da_401(monkeypatch):
+    iss = "https://auth.test.neon.tech"
+    token = _jwt_real(monkeypatch, iss, exp_in=-10)
+    r = client.get("/api/businesses/mine", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 401
+
+
+def test_token_opaco_corto_da_401_token_invalido(monkeypatch):
+    # Regresión del bug real: el frontend mandaba el session token opaco
+    # (~32 chars) en vez del JWT y el backend devolvía 401 mudo.
+    monkeypatch.setattr(settings, "neon_auth_base_url", "https://auth.test.neon.tech")
+    r = client.get(
+        "/api/businesses/mine", headers={"Authorization": "Bearer abcdef1234567890abcdef1234567890"}
+    )
+    assert r.status_code == 401
+    assert r.json()["detail"] == "Token inválido"

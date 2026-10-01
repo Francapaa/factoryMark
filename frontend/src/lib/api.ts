@@ -9,11 +9,21 @@ export class AuthRequiredError extends Error {
   }
 }
 
-/** JWT corto de Neon Auth (EdDSA, 15 min). Siempre fresco: pedirlo antes de cada llamada. */
+/** El JWT vive en la sesión (Neon lo inyecta vía header set-auth-jwt).
+ * Un JWT real tiene 3 segmentos base64; los tokens opacos de sesión no.
+ * Si viaja un opaco, el backend jamás podría validarlo: fallar acá con
+ * mensaje claro en vez de cosechar un 401 mudo. */
+export function isJwtShape(token: string): boolean {
+  return token.split(".").length === 3 && token.length > 100;
+}
+
+/** JWT de la sesión de Neon Auth. Siempre fresco: pedirlo antes de cada llamada. */
 export async function getAccessToken(): Promise<string> {
-  const { data, error } = await authClient.token();
-  const token = (data as { token?: string } | null)?.token;
-  if (error || !token) throw new AuthRequiredError();
+  const { data, error } = await authClient.getSession();
+  const token = (data?.session as { token?: unknown } | undefined)?.token;
+  if (error || typeof token !== "string" || !isJwtShape(token)) {
+    throw new AuthRequiredError();
+  }
   return token;
 }
 
