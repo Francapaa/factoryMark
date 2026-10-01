@@ -12,4 +12,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
 from main import run
 
 if __name__ == "__main__":
-    run()
+    # Uso: uv run dev.py [--log-level debug] desde backend/
+    # (uvicorn main:app directo falla: main vive en src/, no en backend/).
+    log_level = "info"
+    for i, arg in enumerate(sys.argv[1:]):
+        if arg == "--log-level" and i + 1 < len(sys.argv[1:]):
+            log_level = sys.argv[1:][i + 1]
+        elif arg.startswith("--log-level="):
+            log_level = arg.split("=", 1)[1]
+    run(log_level=log_level)
