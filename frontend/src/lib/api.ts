@@ -16,7 +16,7 @@ export class SessionTimeoutError extends Error {
   }
 }
 
-/** El JWT vive en la sesión (Neon lo inyecta vía header set-auth-jwt).
+/** JWT corto de Neon Auth (EdDSA, 15 min) vía GET /api/auth/token.
  * Un JWT real tiene 3 segmentos base64; los tokens opacos de sesión no.
  * Si viaja un opaco, el backend jamás podría validarlo: fallar acá con
  * mensaje claro en vez de cosechar un 401 mudo. */
@@ -34,21 +34,33 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
-/** JWT de la sesión de Neon Auth. Siempre fresco: pedirlo antes de cada llamada.
- * Nunca cuelga en silencio: si la sesión no resuelve en 8s, lanza SessionTimeoutError. */
+/** JWT corto de Neon Auth (EdDSA, 15 min). Siempre fresco: pedirlo antes de cada llamada.
+ * Nunca cuelga en silencio: si el token no resuelve en 8s, lanza SessionTimeoutError. */
 export async function getAccessToken(): Promise<string> {
-  let session: Awaited<ReturnType<typeof authClient.getSession>> | null = null;
-  let sessionError: unknown = null;
+  let tokenData: Awaited<ReturnType<typeof authClient.token>>["data"] | null = null;
+  let tokenError: unknown = null;
   try {
-    const res = await withTimeout(authClient.getSession(), SESSION_TIMEOUT_MS);
-    session = res.data;
-    sessionError = res.error;
+    const res = await withTimeout(authClient.token(), SESSION_TIMEOUT_MS);
+    tokenData = res.data;
+    tokenError = res.error;
   } catch (err) {
     if (err instanceof SessionTimeoutError) throw err;
     throw new AuthRequiredError();
   }
-  const token = (session?.session as { token?: unknown } | undefined)?.token;
-  if (sessionError || typeof token !== "string" || !isJwtShape(token)) {
+  const token = (tokenData as { token?: unknown } | null)?.token;
+  // TEMPORAL debug opción A: forma del token, nunca el token completo.
+  if (typeof token === "string") {
+    console.debug("[auth] token shape", {
+      len: token.length,
+      segments: token.split(".").length,
+      prefix10: token.slice(0, 10),
+      isJwtShape: isJwtShape(token),
+      tokenError: tokenError ? String(tokenError) : null,
+    });
+  } else {
+    console.debug("[auth] token ausente", { tokenError: tokenError ? String(tokenError) : null });
+  }
+  if (tokenError || typeof token !== "string" || !isJwtShape(token)) {
     throw new AuthRequiredError();
   }
   return token;
@@ -63,6 +75,14 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
     ...init,
     headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
   });
-  if (res.status === 401) throw new AuthRequiredError();
+  if (res.status === 401) {
+    // TEMPORAL debug opción A: ver el detail real del backend (401 mudo).
+    const clone = res.clone();
+    clone
+      .json()
+      .then((body) => console.debug("[auth] backend 401", { path, body }))
+      .catch(() => console.debug("[auth] backend 401 sin JSON", { path }));
+    throw new AuthRequiredError();
+  }
   return res;
 }
