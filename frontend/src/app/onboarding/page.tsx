@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { OnboardingFlow } from "./components";
+import { OnboardingFlow, OnboardingGate } from "./components";
 import UserMenu from "@/components/UserMenu";
 import { getAuth } from "@/lib/auth/server";
 
@@ -27,7 +27,9 @@ export default async function OnboardingPage() {
         <h1 className="text-3xl font-semibold tracking-tight text-black dark:text-zinc-50">
           Registrá tu negocio
         </h1>
-        <OnboardingFlow />
+        <OnboardingGate>
+          <OnboardingFlow />
+        </OnboardingGate>
       </main>
     </div>
   );

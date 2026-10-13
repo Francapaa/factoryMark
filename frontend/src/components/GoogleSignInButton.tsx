@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion } from "framer-motion";
 import { authClient } from "@/lib/auth/client";
 
 function GoogleIcon() {
@@ -36,13 +37,14 @@ export default function GoogleSignInButton({ disabled = false }: { disabled?: bo
     try {
       // URLs absolutas: el servicio managed redirige a callbackURL (existentes)
       // y a newUserCallbackURL (primer ingreso). Relativas defaultean a `/`
-      // dejando el verifier colgado. El destino es /onboarding: el dashboard
-      // exige negocio guardado y el gate lo redirigiría igual.
-      const onboardingUrl = `${window.location.origin}/onboarding`;
+      // dejando el verifier colgado.
+      // Existente → /dashboard (si nunca terminó onboarding, el BusinessGate
+      // lo devuelve a /onboarding). Primer ingreso → /onboarding.
+      const origin = window.location.origin;
       const res = await authClient.signIn.social({
         provider: "google",
-        callbackURL: onboardingUrl,
-        newUserCallbackURL: onboardingUrl,
+        callbackURL: `${origin}/dashboard`,
+        newUserCallbackURL: `${origin}/onboarding`,
       });
       if (res?.error) {
         setError("No se pudo iniciar sesión con Google. Probá de nuevo.");
@@ -58,16 +60,19 @@ export default function GoogleSignInButton({ disabled = false }: { disabled?: bo
 
   return (
     <div className="flex flex-col gap-2">
-      <button
+      <motion.button
         type="button"
         onClick={onClick}
         disabled={disabled || loading}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-5 py-3 font-medium text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:hover:bg-zinc-700"
+        whileHover={{ y: -2 }}
+        whileTap={{ scale: 0.98 }}
+        transition={{ duration: 0.2 }}
+        className="font-display flex w-full items-center justify-center gap-3 rounded-full bg-[#FFF7ED] px-5 py-4 text-base font-semibold text-[#0A0A0B] shadow-[0_0_32px_rgba(255,92,0,0.35)] transition-colors hover:bg-white hover:shadow-[0_0_48px_rgba(255,92,0,0.55)] disabled:opacity-50"
       >
         <GoogleIcon />
         {loading ? "Conectando con Google…" : "Continuar con Google"}
-      </button>
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      </motion.button>
+      {error && <p className="text-sm text-red-400">{error}</p>}
     </div>
   );
 }

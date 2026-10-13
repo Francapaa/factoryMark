@@ -1,4 +1,4 @@
-"""Dev server: `uv run dev.py` desde backend/ (uvicorn con reload en 127.0.0.1:8000).
+"""Dev server: `uv run dev.py` desde backend/ (uvicorn con reload en 127.0.0.1:8080).
 
 Nota: `uv run dev` (nombre pelado) no es soportado por uv — uv no tiene
 alias de tareas como npm; solo resuelve ejecutables o rutas a scripts.
