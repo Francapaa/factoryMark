@@ -14,6 +14,7 @@ class AgentState(TypedDict, total=False):
     anchor: dict | None
     competitors: list[dict]
     reviews_by_place: dict[str, list[str]]
+    review_ratings: dict[str, list[int | float]]
     last_review_by_place: dict[str, str]
     web_signals: list[dict]
     clusters: list[dict]

@@ -73,10 +73,7 @@ def _write_cache(path: Path, payload: list[dict]) -> None:
 
 
 def _should_retry(exc: BaseException) -> bool:
-    return (
-        isinstance(exc, httpx.HTTPStatusError)
-        and exc.response.status_code in _RETRYABLE_STATUS
-    )
+    return isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in _RETRYABLE_STATUS
 
 
 @retry(
@@ -254,13 +251,16 @@ def resolve_anchor(
     wait=wait_exponential(multiplier=1, min=1, max=8),
     reraise=True,
 )
-def _get_details(client: httpx.Client, api_key: str, place_id: str) -> dict:
+def _get_details(client: httpx.Client, api_key: str, place_id: str, language: str) -> dict:
     resp = client.get(
         PLACES_DETAILS_URL.format(place_id=place_id),
         headers={
             "X-Goog-Api-Key": api_key,
             "X-Goog-FieldMask": _DETAILS_FIELD_MASK,
         },
+        # Sin esto la API responde en su idioma default (inglés) aunque el
+        # search sí pida español: las reseñas llegaban en EN para locales AR.
+        params={"languageCode": language},
         timeout=20.0,
     )
     resp.raise_for_status()
@@ -283,15 +283,20 @@ def fetch_place_details(
     if not api_key:
         raise RuntimeError("Falta GOOGLE_PLACES_API_KEY en backend/.env")
 
+    language = settings.places_language
     cdir = cache_dir or default_cache_dir()
-    cpath = cdir / f"details_{place_id}.json"
+    cpath = cdir / f"details_{place_id}_{language}.json"
     hit = _read_cache(cpath, settings.places_cache_ttl_hours)
+    if hit is None:
+        # Formato anterior (sin idioma): reutilizar si está fresco para no
+        # gastar cuota por el cambio de formato de caché.
+        hit = _read_cache(cdir / f"details_{place_id}.json", settings.places_cache_ttl_hours)
     data = hit[0] if hit else None
     if not isinstance(data, dict):
         own_client = client is None
         client = client or httpx.Client()
         try:
-            data = _get_details(client, api_key, place_id)
+            data = _get_details(client, api_key, place_id, language)
         finally:
             if own_client:
                 client.close()
@@ -318,7 +323,7 @@ def _normalize_details(place_id: str, data: dict) -> dict:
                 "published_at": r.get("publishTime", ""),
             }
         )
-    hours = ((data.get("regularOpeningHours") or {}).get("weekdayDescriptions", []) or [])
+    hours = (data.get("regularOpeningHours") or {}).get("weekdayDescriptions", []) or []
     photos = [
         p.get("name", "")
         for p in (data.get("photos", []) or [])[:3]

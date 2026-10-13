@@ -87,6 +87,7 @@ def search_web_signals(
                 # Tavily autentica por body (api_key), no por header.
                 "api_key": api_key,
                 "query": query,
+                "language": "spanish",
                 "search_depth": "basic",
                 "max_results": max_results,
                 "include_answer": False,
