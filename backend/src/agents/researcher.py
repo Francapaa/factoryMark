@@ -76,6 +76,10 @@ def _fixtures() -> dict:
     return {
         "competitors": competitors,
         "reviews_by_place": _FIXTURE_REVIEWS,
+        "review_ratings": {
+            "p1": [5, 5, 5, 5, 5, 4, 5, 5],
+            "p2": [1, 2, 1, 2, 1, 2],
+        },
         "last_review_by_place": {},
         "anchor": None,
         "web_signals": [],
@@ -84,24 +88,29 @@ def _fixtures() -> dict:
     }
 
 
-def _enrich_with_details(comp: Competitor, errors: list[str]) -> tuple[list[str], str | None]:
-    """Details de un competidor. Devuelve (review_texts, last_review_iso)."""
+def _enrich_with_details(
+    comp: Competitor, errors: list[str]
+) -> tuple[list[str], list[int], str | None]:
+    """Details de un competidor. Devuelve (review_texts, review_ratings, last_review_iso)."""
     try:
         details = fetch_place_details(comp.place_id)
     except (httpx.HTTPError, RuntimeError, OSError, ValueError) as exc:
         # Degrada: se queda con campos de Search.
         errors.append(f"{comp.place_id}: {exc}")
-        return [], None
+        return [], [], None
     comp.opening_hours = details["opening_hours"]
     comp.photos = details["photos"]
     comp.website = details["website"]
     comp.reviews_fetched = len(details["reviews"])
     texts = [r["text"] for r in details["reviews"]]
+    ratings = [r["rating"] for r in details["reviews"] if isinstance(r.get("rating"), (int, float))]
     last = max((r["published_at"] for r in details["reviews"] if r["published_at"]), default=None)
-    return texts, last
+    return texts, ratings, last
 
 
-def _maps_branch(business_type: str, zone: str, anchor, errors: list[str]) -> tuple[list[dict], dict, dict]:
+def _maps_branch(
+    business_type: str, zone: str, anchor, errors: list[str]
+) -> tuple[list[dict], dict, dict]:
     bias = None
     if anchor and anchor.latitude is not None and anchor.longitude is not None:
         bias = {
@@ -110,7 +119,7 @@ def _maps_branch(business_type: str, zone: str, anchor, errors: list[str]) -> tu
             "radius_m": settings.search_radius_m,
         }
     found = search_competitors(business_type, zone, location_bias=bias)
-    competitors, reviews, last_by_place = [], {}, {}
+    competitors, reviews, ratings_by_place, last_by_place = [], {}, {}, {}
     for comp in found:
         if anchor and comp.place_id == anchor.place_id:
             continue  # el propio comercio no es su competidor
@@ -119,14 +128,16 @@ def _maps_branch(business_type: str, zone: str, anchor, errors: list[str]) -> tu
             comp.distance_m = round(
                 haversine_m(bias["latitude"], bias["longitude"], comp.latitude, comp.longitude), 1
             )
-        texts, last = _enrich_with_details(comp, errors)
+        texts, ratings, last = _enrich_with_details(comp, errors)
         if texts:
             reviews[comp.place_id] = texts
+            if ratings:
+                ratings_by_place[comp.place_id] = ratings
             if last:
                 last_by_place[comp.place_id] = last
         competitors.append(comp.model_dump())
     competitors.sort(key=lambda c: (c.get("distance_m") is None, c.get("distance_m") or 0))
-    return competitors, reviews, last_by_place
+    return competitors, reviews, ratings_by_place, last_by_place
 
 
 def _online_queries(business_name: str, business_type: str, zone: str) -> list[str]:
@@ -137,7 +148,9 @@ def _online_queries(business_name: str, business_type: str, zone: str) -> list[s
     ][: max(1, settings.tavily_max_queries)]
 
 
-def _web_branch(business_name: str, business_type: str, zone: str, errors: list[str]) -> tuple[list[dict], dict, list[dict]]:
+def _web_branch(
+    business_name: str, business_type: str, zone: str, errors: list[str]
+) -> tuple[list[dict], dict, list[dict]]:
     from tools.tavily import search_web_signals
 
     signals: list[dict] = []
@@ -182,6 +195,7 @@ def researcher_node(state: dict) -> dict:
     anchor = None
     competitors: list[dict] = []
     reviews: dict[str, list[str]] = {}
+    review_ratings: dict[str, list[int]] = {}
     last_by_place: dict[str, str] = {}
     web_signals: list[dict] = []
 
@@ -193,9 +207,12 @@ def researcher_node(state: dict) -> dict:
             errors.append("sin GOOGLE_PLACES_API_KEY: rama Maps omitida")
         else:
             anchor = resolve_anchor(business_name, zone)  # 404 explícito si no existe
-            maps_comps, maps_reviews, maps_last = _maps_branch(business_type, zone, anchor, errors)
+            maps_comps, maps_reviews, maps_ratings, maps_last = _maps_branch(
+                business_type, zone, anchor, errors
+            )
             competitors.extend(maps_comps)
             reviews.update(maps_reviews)
+            review_ratings.update(maps_ratings)
             last_by_place.update(maps_last)
 
     if wants_web:
@@ -208,7 +225,9 @@ def researcher_node(state: dict) -> dict:
                 )
             errors.append(msg)
         else:
-            web_comps, web_reviews, web_signals = _web_branch(business_name, business_type, zone, errors)
+            web_comps, web_reviews, web_signals = _web_branch(
+                business_name, business_type, zone, errors
+            )
             have_ids = {c["place_id"] for c in competitors}
             for c in web_comps:
                 if c["place_id"] not in have_ids:
@@ -218,6 +237,7 @@ def researcher_node(state: dict) -> dict:
     return {
         "competitors": competitors[: settings.max_competitors],
         "reviews_by_place": reviews,
+        "review_ratings": review_ratings,
         "last_review_by_place": last_by_place,
         "anchor": anchor.model_dump() if anchor else None,
         "web_signals": web_signals,

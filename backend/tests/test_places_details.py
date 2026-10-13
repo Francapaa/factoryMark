@@ -46,7 +46,10 @@ def test_resolve_anchor_ok(monkeypatch, tmp_path):
         ]
     )
     anchor = places.resolve_anchor(
-        "Café Martínez", "Palermo", client=_client(lambda r: httpx.Response(200, json=payload)), cache_dir=tmp_path
+        "Café Martínez",
+        "Palermo",
+        client=_client(lambda r: httpx.Response(200, json=payload)),
+        cache_dir=tmp_path,
     )
     assert anchor.place_id == "anchor1"
     assert anchor.latitude == pytest.approx(-34.58)
@@ -123,3 +126,55 @@ def test_fetch_details_sin_key_error_claro(monkeypatch, tmp_path):
     monkeypatch.setattr(places.settings, "google_places_api_key", "")
     with pytest.raises(RuntimeError, match="GOOGLE_PLACES_API_KEY"):
         places.fetch_place_details("p1", cache_dir=tmp_path)
+
+
+def test_fetch_details_manda_language_code(monkeypatch, tmp_path):
+    monkeypatch.setattr(places.settings, "google_places_api_key", "k")
+    monkeypatch.setattr(places.settings, "places_language", "es")
+    seen = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["params"] = dict(request.url.params)
+        return httpx.Response(200, json={"id": "p1", "reviews": []})
+
+    places.fetch_place_details("p1", client=_client(handler), cache_dir=tmp_path)
+    assert seen["params"].get("languageCode") == "es"
+    assert (tmp_path / "details_p1_es.json").exists()
+
+
+def test_fetch_details_cache_separada_por_idioma(monkeypatch, tmp_path):
+    monkeypatch.setattr(places.settings, "google_places_api_key", "k")
+    monkeypatch.setattr(places.settings, "places_language", "es")
+    payload = {"id": "p1", "reviews": []}
+    places.fetch_place_details(
+        "p1", client=_client(lambda r: httpx.Response(200, json=payload)), cache_dir=tmp_path
+    )
+    # Mismo lugar, otro idioma: no debe reusar el caché en español.
+    monkeypatch.setattr(places.settings, "places_language", "en")
+    calls = {"n": 0}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls["n"] += 1
+        return httpx.Response(200, json=payload)
+
+    places.fetch_place_details("p1", client=_client(handler), cache_dir=tmp_path)
+    assert calls["n"] == 1
+
+
+def test_fetch_details_reusa_cache_legado_sin_idioma(monkeypatch, tmp_path):
+    import json
+    from datetime import UTC, datetime
+
+    monkeypatch.setattr(places.settings, "google_places_api_key", "k")
+    monkeypatch.setattr(places.settings, "places_language", "es")
+    payload = {"id": "p1", "reviews": []}
+    (tmp_path / "details_p1.json").write_text(
+        json.dumps({"saved_at": datetime.now(UTC).isoformat(), "payload": [payload]}),
+        encoding="utf-8",
+    )
+
+    def boom(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("debió reusar el caché legado")
+
+    out = places.fetch_place_details("p1", client=_client(boom), cache_dir=tmp_path)
+    assert out["place_id"] == "p1"
