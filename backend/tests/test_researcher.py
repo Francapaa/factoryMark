@@ -3,7 +3,6 @@
 import httpx
 import pytest
 
-import db
 from agents.researcher import haversine_m, researcher_node
 from tools import places
 from tools import tavily as tavily_mod
@@ -157,33 +156,28 @@ def test_falla_tavily_no_rompe_maps(monkeypatch, tmp_path):
     assert any("tavily" in e for e in out["meta"]["research_errors"])
 
 
-def test_endpoint_404_cuando_ancla_no_existe(monkeypatch, tmp_path):
+def test_endpoint_404_cuando_ancla_no_existe(monkeypatch, tmp_path, db_isolated):
+    import os
+
+    import pytest
     from fastapi.testclient import TestClient
 
     from config import settings
     from main import app
 
+    if not os.getenv("DATABASE_URL"):
+        pytest.skip("requiere Postgres efímera (DATABASE_URL)")
+    import db as dbmod
+
     monkeypatch.setattr(settings, "auth_disabled", True)
     _mock_net(monkeypatch, tmp_path, _make_handler(anchor_places=[]))
 
-    # El gate exige onboarding: el negocio guardado coincide con el payload
-    # para que el run llegue a resolver el ancla (y falle 404).
-    monkeypatch.setattr(
-        db,
-        "get_my_business",
-        lambda owner_id: {
-            "id": "b1",
-            "owner_id": owner_id,
-            "name": "No Existe",
-            "business_type": "café",
-            "sales_channel": "local",
-            "zone": "Palermo",
-            "anchor_place_id": "anchor-x",
-            "anchor_snapshot": {},
-            "brand_kit": None,
-            "created_at": None,
-            "updated_at": None,
-        },
+    # El gate exige onboarding real: guardamos el negocio para que el run
+    # llegue a resolver el ancla (y falle 404 con mensaje accionable).
+    dbmod.save_my_business(
+        "dev-user", name="No Existe", business_type="café",
+        sales_channel="local", zone="Palermo",
+        anchor_place_id="anchor-x", anchor_snapshot={},
     )
     r = TestClient(app).post(
         "/api/analyze",

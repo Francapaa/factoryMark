@@ -21,4 +21,5 @@ class AgentState(TypedDict, total=False):
     scores: dict[str, float]
     opportunities: list[dict]
     draft_post: dict | None
+    meta: dict
     trace: Annotated[list[str], operator.add]

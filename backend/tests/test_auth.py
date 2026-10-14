@@ -74,15 +74,35 @@ def test_sin_base_url_da_503(monkeypatch):
     assert getattr(exc.value, "status_code", None) == 503
 
 
-def test_auth_disabled_permite_pasar(monkeypatch):
+def test_auth_disabled_permite_pasar(monkeypatch, db_isolated):
+    import os
+
+    import pytest
+
+    if not os.getenv("DATABASE_URL"):
+        pytest.skip("requiere Postgres efímera (DATABASE_URL)")
+    import db as dbmod
+
     monkeypatch.setattr(settings, "auth_disabled", True)
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
+    dbmod.save_my_business(
+        "dev-user", name="Café Ejemplo", business_type="café",
+        sales_channel="local", zone="Palermo Soho",
+        anchor_place_id="anchor1", anchor_snapshot={},
+    )
     r = client.post("/api/analyze", json=PAYLOAD)
     assert r.status_code == 200
     assert r.json()["meta"]["user_id"] == "dev-user"
 
 
-def test_usuario_mockeado_llega_al_endpoint(monkeypatch):
+def test_usuario_mockeado_llega_al_endpoint(monkeypatch, db_isolated):
+    import os
+
+    import pytest
+
+    if not os.getenv("DATABASE_URL"):
+        pytest.skip("requiere Postgres efímera (DATABASE_URL)")
+    import db as dbmod
+
     async def _fake_dep():
         return CurrentUser(id="u-123", email="a@b.com", name="A")
 
@@ -90,7 +110,11 @@ def test_usuario_mockeado_llega_al_endpoint(monkeypatch):
     from main import app as _app
 
     _app.dependency_overrides[auth.get_current_user] = _fake_dep
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
+    dbmod.save_my_business(
+        "u-123", name="Café Ejemplo", business_type="café",
+        sales_channel="local", zone="Palermo Soho",
+        anchor_place_id="anchor1", anchor_snapshot={},
+    )
     try:
         r = client.post("/api/analyze", json=PAYLOAD)
         assert r.status_code == 200
@@ -138,10 +162,22 @@ def _jwt_real(monkeypatch, iss, sub="user-1", exp_in=600, base_url=None, aud=Non
     )
 
 
-def test_jwt_real_pasa_el_gate_y_llega_al_endpoint(monkeypatch):
+def test_jwt_real_pasa_el_gate_y_llega_al_endpoint(monkeypatch, db_isolated):
+    import os
+
+    import pytest
+
+    if not os.getenv("DATABASE_URL"):
+        pytest.skip("requiere Postgres efímera (DATABASE_URL)")
+    import db as dbmod
+
     iss = "https://auth.test.neon.tech"
     token = _jwt_real(monkeypatch, iss)
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
+    dbmod.save_my_business(
+        "user-1", name="Café Ejemplo", business_type="café",
+        sales_channel="local", zone="Palermo Soho",
+        anchor_place_id="anchor1", anchor_snapshot={},
+    )
     r = client.get("/api/businesses/mine", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json()["owner_id"] == "user-1"
@@ -179,24 +215,48 @@ def test_token_opaco_corto_da_401_token_invalido(monkeypatch):
     assert r.json()["detail"] == "Token inválido"
 
 
-def test_jwt_neon_con_path_en_base_e_iss_origen_pasa(monkeypatch):
+def test_jwt_neon_con_path_en_base_e_iss_origen_pasa(monkeypatch, db_isolated):
+    import os
+
+    import pytest
+
+    if not os.getenv("DATABASE_URL"):
+        pytest.skip("requiere Postgres efímera (DATABASE_URL)")
+    import db as dbmod
+
     # Bug real 2026-10-01: NEON_AUTH_BASE_URL incluye /neondb/auth pero Neon
     # emite iss/aud como origen. El gate debe aceptar el origen.
     origin = "https://ep-test.neonauth.aws.neon.tech"
     base = f"{origin}/neondb/auth"
     token = _jwt_real(monkeypatch, origin, base_url=base, aud=origin)
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
+    dbmod.save_my_business(
+        "user-1", name="Café Ejemplo", business_type="café",
+        sales_channel="local", zone="Palermo Soho",
+        anchor_place_id="anchor1", anchor_snapshot={},
+    )
     r = client.get("/api/businesses/mine", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json()["owner_id"] == "user-1"
 
 
-def test_jwt_con_aud_valida_pasa(monkeypatch):
+def test_jwt_con_aud_valida_pasa(monkeypatch, db_isolated):
+    import os
+
+    import pytest
+
+    if not os.getenv("DATABASE_URL"):
+        pytest.skip("requiere Postgres efímera (DATABASE_URL)")
+    import db as dbmod
+
     # PyJWT rechaza el token si trae aud y no se pasa audience: el backend
     # valida aud manual contra el set permitido en vez de fallar con 401 mudo.
     iss = "https://auth.test.neon.tech"
     token = _jwt_real(monkeypatch, iss, aud=iss)
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
+    dbmod.save_my_business(
+        "user-1", name="Café Ejemplo", business_type="café",
+        sales_channel="local", zone="Palermo Soho",
+        anchor_place_id="anchor1", anchor_snapshot={},
+    )
     r = client.get("/api/businesses/mine", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
 
