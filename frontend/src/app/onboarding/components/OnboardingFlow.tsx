@@ -3,6 +3,18 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  ArrowRight,
+  Check,
+  ExternalLink,
+  Globe,
+  Loader2,
+  MapPin,
+  Search,
+  Star,
+  Store,
+} from "lucide-react";
 import { AuthRequiredError } from "@/lib/api";
 import {
   getPhotoObjectUrl,
@@ -11,11 +23,63 @@ import {
   type ResolvedBusiness,
 } from "@/lib/businesses";
 import type { SalesChannel } from "@/types/analysis";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+const ease = [0.22, 1, 0.36, 1] as const;
 
 const inputClassName =
-  "flex-1 rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800";
+  "w-full rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-[15px] text-white placeholder:text-zinc-500 outline-none transition focus:border-[#FF5C00]/60 focus:bg-white/[0.05] focus:ring-2 focus:ring-[#FF5C00]/20";
+
+const labelClassName =
+  "font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500";
 
 type Step = "form" | "confirm";
+
+const STEPS = ["Buscá tu local", "Confirmá"];
+
+function Stepper({ step }: { step: Step }) {
+  const activeIndex = step === "form" ? 0 : 1;
+  return (
+    <div className="flex items-center gap-2" aria-label="Progreso del onboarding">
+      {STEPS.map((label, i) => {
+        const done = activeIndex > i;
+        const active = activeIndex === i;
+        return (
+          <div key={label} className="flex flex-1 items-center gap-2 last:flex-none">
+            <span
+              className={cn(
+                "font-display grid h-7 w-7 shrink-0 place-items-center rounded-lg text-xs font-bold transition-all",
+                done && "bg-emerald-500/20 text-emerald-400",
+                active && !done && "bg-[#FF5C00] text-[#0A0A0B] shadow-[0_0_16px_rgba(255,92,0,0.5)]",
+                !done && !active && "bg-white/5 text-zinc-500"
+              )}
+            >
+              {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+            </span>
+            <span
+              className={cn(
+                "font-display hidden text-xs font-medium sm:block",
+                active ? "text-white" : "text-zinc-500"
+              )}
+            >
+              {label}
+            </span>
+            {i < STEPS.length - 1 && <span className="h-px flex-1 bg-white/10" aria-hidden />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ErrorBox({ message }: { message: string }) {
+  return (
+    <p className="rounded-2xl border border-[#FF5C00]/30 bg-[#FF5C00]/10 p-4 text-sm leading-relaxed text-[#FFD9A3]">
+      {message}
+    </p>
+  );
+}
 
 export default function OnboardingFlow() {
   const router = useRouter();
@@ -113,123 +177,212 @@ export default function OnboardingFlow() {
     setError("");
   }
 
-  if (step === "confirm" && resolved) {
-    return (
-      <div className="flex flex-col gap-4">
-        <h2 className="text-xl font-semibold">¿Este es tu local?</h2>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-800">
-          {photoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt={resolved.name} className="max-h-64 w-full object-cover" />
-          )}
-          <div className="flex flex-col gap-1 p-4">
-            <p className="text-lg font-medium">{resolved.name}</p>
-            <p className="text-sm text-zinc-500">{resolved.address}</p>
-            {resolved.rating != null && (
-              <p className="text-sm text-zinc-500">⭐ {resolved.rating}</p>
-            )}
-            {resolved.hours_summary.length > 0 && (
-              <p className="text-sm text-zinc-500">{resolved.hours_summary[0]}</p>
-            )}
-            <a
-              href={resolved.maps_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm font-medium text-blue-600 underline dark:text-blue-400"
-            >
-              Ver en Google Maps
-            </a>
-          </div>
-        </div>
-        {status === "error" && (
-          <p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </p>
-        )}
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={status === "saving"}
-            className="flex-1 rounded-lg bg-black px-5 py-2 font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-          >
-            {status === "saving" ? "Guardando…" : "Confirmar, es mi local"}
-          </button>
-          <button
-            type="button"
-            onClick={onReject}
-            disabled={status === "saving"}
-            className="flex-1 rounded-lg border border-zinc-300 px-5 py-2 font-medium dark:border-zinc-700"
-          >
-            No es este
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="flex flex-col gap-4">
-      <h2 className="text-xl font-semibold">¿Cuál es tu local?</h2>
-      <p className="text-sm text-zinc-500">
-        Lo buscamos en Google Maps una sola vez y lo guardamos para todos tus análisis.
-      </p>
-      <form onSubmit={onResolve} className="flex flex-col gap-3">
-        <input
-          className={inputClassName}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Nombre de tu comercio (ej: Café Martínez)"
-          aria-label="Nombre de tu comercio"
-          required
-        />
-        <input
-          className={inputClassName}
-          value={zone}
-          onChange={(e) => setZone(e.target.value)}
-          placeholder="Zona (ej: Palermo Soho, Buenos Aires)"
-          aria-label="Zona"
-          required
-        />
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <input
-            className={inputClassName}
-            value={businessType}
-            onChange={(e) => setBusinessType(e.target.value)}
-            placeholder="Tipo de negocio"
-            aria-label="Tipo de negocio"
-            required
-          />
-          <select
-            className="rounded-lg border border-zinc-300 px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800"
-            value={salesChannel}
-            onChange={(e) => setSalesChannel(e.target.value as SalesChannel)}
-            aria-label="Canal de venta"
+    <div className="flex flex-col gap-6">
+      <Stepper step={step} />
+      <AnimatePresence mode="wait" initial={false}>
+        {step === "confirm" && resolved ? (
+          <motion.div
+            key="confirm"
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.35, ease }}
+            className="flex flex-col gap-4"
           >
-            <option value="local">Local (compite por cercanía)</option>
-            <option value="online">Online (compite en web)</option>
-            <option value="mixto">Mixto (ambos)</option>
-          </select>
-        </div>
-        <button
-          type="submit"
-          disabled={status === "loading"}
-          className="rounded-lg bg-black px-5 py-2 font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
-        >
-          {status === "loading" ? "Buscando…" : "Buscar mi local"}
-        </button>
-      </form>
-      {status === "error" && (
-        <p className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-      <p className="text-xs text-zinc-400">
-        ¿Ya tenés tu local guardado?{" "}
-        <Link href="/dashboard" className="underline">
-          Ir a la app
-        </Link>
-      </p>
+            <div>
+              <h3 className="font-display text-xl font-semibold text-white">
+                ¿Este es tu local?
+              </h3>
+              <p className="mt-1 text-sm text-zinc-500">
+                Confirmalo y arrancamos con el análisis de tu zona.
+              </p>
+            </div>
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/50">
+              {photoUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={photoUrl}
+                  alt={resolved.name}
+                  className="max-h-56 w-full object-cover"
+                />
+              )}
+              <div className="flex flex-col gap-1.5 p-5">
+                <p className="font-display text-lg font-semibold text-white">
+                  {resolved.name}
+                </p>
+                <p className="flex items-start gap-1.5 text-sm text-zinc-400">
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5C00]" />
+                  {resolved.address}
+                </p>
+                {resolved.rating != null && (
+                  <p className="flex items-center gap-1.5 text-sm text-zinc-400">
+                    <Star className="h-4 w-4 fill-[#FF5C00] text-[#FF5C00]" />
+                    {resolved.rating}
+                  </p>
+                )}
+                {resolved.hours_summary.length > 0 && (
+                  <p className="text-sm text-zinc-500">{resolved.hours_summary[0]}</p>
+                )}
+                <a
+                  href={resolved.maps_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 flex items-center gap-1.5 text-sm font-medium text-[#FFB25C] underline-offset-4 transition-colors hover:text-[#FFD9A3] hover:underline"
+                >
+                  Ver en Google Maps <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </div>
+            </div>
+            {status === "error" && <ErrorBox message={error} />}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                variant="primary"
+                size="md"
+                onClick={onConfirm}
+                disabled={status === "saving"}
+                className="flex-1"
+              >
+                {status === "saving" ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> Guardando…
+                  </>
+                ) : (
+                  <>
+                    <Check className="h-4 w-4" /> Confirmar, es mi local
+                  </>
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="dark"
+                size="md"
+                onClick={onReject}
+                disabled={status === "saving"}
+                className="flex-1"
+              >
+                No es este
+              </Button>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="form"
+            initial={{ opacity: 0, x: -24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 24 }}
+            transition={{ duration: 0.35, ease }}
+            className="flex flex-col gap-4"
+          >
+            <div>
+              <h3 className="font-display text-xl font-semibold text-white">
+                ¿Cuál es tu local?
+              </h3>
+              <p className="mt-1 text-sm leading-relaxed text-zinc-500">
+                Lo buscamos en Google Maps una sola vez y lo guardamos para todos tus
+                análisis.
+              </p>
+            </div>
+            <form onSubmit={onResolve} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="onboarding-name" className={labelClassName}>
+                  <span className="flex items-center gap-1.5">
+                    <Store className="h-3.5 w-3.5 text-[#FF5C00]" /> Nombre de tu comercio
+                  </span>
+                </label>
+                <input
+                  id="onboarding-name"
+                  className={inputClassName}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Ej: Café Martínez"
+                  aria-label="Nombre de tu comercio"
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="onboarding-zone" className={labelClassName}>
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5 text-[#FF5C00]" /> Zona
+                  </span>
+                </label>
+                <input
+                  id="onboarding-zone"
+                  className={inputClassName}
+                  value={zone}
+                  onChange={(e) => setZone(e.target.value)}
+                  placeholder="Ej: Palermo Soho, Buenos Aires"
+                  aria-label="Zona"
+                  required
+                />
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="onboarding-type" className={labelClassName}>
+                    Tipo de negocio
+                  </label>
+                  <input
+                    id="onboarding-type"
+                    className={inputClassName}
+                    value={businessType}
+                    onChange={(e) => setBusinessType(e.target.value)}
+                    placeholder="Tipo de negocio"
+                    aria-label="Tipo de negocio"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="onboarding-channel" className={labelClassName}>
+                    <span className="flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-[#FF5C00]" /> Canal de venta
+                    </span>
+                  </label>
+                  <select
+                    id="onboarding-channel"
+                    className={cn(inputClassName, "[&>option]:bg-[#1A1A1E] [&>option]:text-white")}
+                    value={salesChannel}
+                    onChange={(e) => setSalesChannel(e.target.value as SalesChannel)}
+                    aria-label="Canal de venta"
+                  >
+                    <option value="local">Local (compite por cercanía)</option>
+                    <option value="online">Online (compite en web)</option>
+                    <option value="mixto">Mixto (ambos)</option>
+                  </select>
+                </div>
+              </div>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                disabled={status === "loading"}
+                className="w-full"
+              >
+                {status === "loading" ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" /> Buscando…
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-5 w-5" /> Buscar mi local{" "}
+                    <ArrowRight className="h-5 w-5" />
+                  </>
+                )}
+              </Button>
+            </form>
+            {status === "error" && <ErrorBox message={error} />}
+            <p className="text-xs text-zinc-500">
+              ¿Ya tenés tu local guardado?{" "}
+              <Link
+                href="/dashboard"
+                className="font-medium text-[#FFB25C] underline-offset-4 transition-colors hover:text-[#FFD9A3] hover:underline"
+              >
+                Ir a la app
+              </Link>
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
