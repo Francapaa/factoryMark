@@ -16,6 +16,19 @@ def _block_network(monkeypatch):
     monkeypatch.setattr(httpx2.Client, "request", boom)
 
 
+@pytest.fixture(autouse=True)
+def _modo_stub_aislado(monkeypatch, tmp_path):
+    """Hermético: sin keys (fuerza fixtures, researcher.py:179) y sin caché
+    real — o los datos del uso manual (backend/data/cache) rompen el stub."""
+    import tools.places as places_mod
+    from tools import tavily as tavily_mod
+
+    monkeypatch.setattr(places_mod.settings, "google_places_api_key", "")
+    monkeypatch.setattr(tavily_mod.settings, "tavily_api_key", "")
+    monkeypatch.setattr(places_mod, "default_cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(tavily_mod, "default_cache_dir", lambda: tmp_path)
+
+
 def test_flujo_completo_orden_y_salida(monkeypatch):
     _block_network(monkeypatch)
     result = run_analysis("Café Ejemplo", "café", "Palermo Soho", "local")

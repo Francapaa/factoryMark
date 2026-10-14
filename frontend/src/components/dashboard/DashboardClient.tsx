@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Flame } from "lucide-react";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
 import { getMyBusiness } from "@/lib/businesses";
+import { completeInstagramCallback } from "@/lib/instagram";
 import {
   dashboardReducer,
   initialDashboardState,
@@ -20,6 +21,7 @@ import {
   StudioEntry,
 } from "./ContentSections";
 import { InstagramCard } from "./InstagramCard";
+import { ScheduledPosts } from "./ScheduledPosts";
 import { SectionCard } from "./SectionCard";
 
 export function DashboardClient() {
@@ -63,6 +65,56 @@ export function DashboardClient() {
     })();
 
     void (async () => {
+      // Retorno del OAuth: /api/instagram/callback puentea a ?ig_code&ig_state.
+      // Se completa acá (con JWT) y se limpia la URL para no reintentar.
+      const params = new URLSearchParams(window.location.search);
+      const igCode = params.get("ig_code");
+      const igState = params.get("ig_state");
+      const igError = params.get("ig_error");
+      if (igCode || igState || igError) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+      if (igError) {
+        if (!cancelled) {
+          dispatch({
+            type: "ig/set",
+            state: { status: "error", message: `Instagram denegó el acceso (${igError}). Probá de nuevo.` },
+          });
+        }
+        return;
+      }
+      if (igCode && igState) {
+        try {
+          const body = await completeInstagramCallback(igCode, igState);
+          if (cancelled) return;
+          if (body.estado === "conectado" && body.username) {
+            const profile: IGProfile = {
+              username: body.username,
+              followers_count: body.followers_count,
+              media_count: body.media_count,
+              can_publish: body.can_publish,
+            };
+            dispatch({ type: "ig/set", state: { status: "conectado", profile } });
+          } else {
+            dispatch({ type: "ig/set", state: { status: "desconectado" } });
+          }
+          return;
+        } catch (e) {
+          if (cancelled) return;
+          if (e instanceof AuthRequiredError) {
+            router.push("/login");
+            return;
+          }
+          dispatch({
+            type: "ig/set",
+            state: {
+              status: "error",
+              message: e instanceof Error ? e.message : "No pudimos completar la conexión",
+            },
+          });
+          return;
+        }
+      }
       try {
         const res = await apiFetch("/api/instagram/status");
         if (cancelled) return;
@@ -75,12 +127,14 @@ export function DashboardClient() {
           username?: string;
           followers_count?: number;
           media_count?: number;
+          can_publish?: boolean;
         };
         if (body.estado === "conectado" && body.username) {
           const profile: IGProfile = {
             username: body.username,
             followers_count: body.followers_count,
             media_count: body.media_count,
+            can_publish: body.can_publish,
           };
           dispatch({ type: "ig/set", state: { status: "conectado", profile } });
         } else if (body.estado === "expirado") {
@@ -269,12 +323,23 @@ export function DashboardClient() {
         <SectionCard
           badge="Publicaciones"
           title="Borradores y publicaciones"
-          hint="Copiá y exportá tus textos. La publicación automática llega tras la aprobación de Meta."
+          hint="Copiá y exportá tus textos, o programalos para Instagram con tu aprobación."
         >
           <PublicationsSection
             draft={draft}
             opportunityTitle={opportunities[0]?.title}
             searched={searched}
+          />
+        </SectionCard>
+
+        <SectionCard
+          badge="Programadas"
+          title="Publicaciones programadas"
+          hint="Se publican solas a la hora elegida. Nada sale sin que lo hayas programado vos."
+        >
+          <ScheduledPosts
+            connected={ig.status === "conectado"}
+            onAuthError={goLogin}
           />
         </SectionCard>
 

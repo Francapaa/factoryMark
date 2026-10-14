@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
+import { getPublishingLimit } from "@/lib/instagram";
 import type { IGState } from "@/types/dashboard";
 import { ErrorState } from "./SectionCard";
 
@@ -38,6 +39,25 @@ export function InstagramCard({
   onAuthError: () => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [quota, setQuota] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (state.status !== "conectado" || state.profile.can_publish === false) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const body = await getPublishingLimit();
+        if (cancelled) return;
+        const usage = body["quota_usage"];
+        setQuota(typeof usage === "number" ? `${usage}/100 usados hoy` : null);
+      } catch {
+        if (!cancelled) setQuota(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [state]);
 
   async function connect() {
     setBusy(true);
@@ -133,7 +153,30 @@ export function InstagramCard({
         </>
       )}
 
-      {state.status === "conectado" && (
+      {state.status === "conectado" && state.profile.can_publish === false && (
+        <>
+          <p className="mt-3 text-sm text-zinc-200">
+            <span className="font-semibold text-white">@{state.profile.username}</span>
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Tu conexión es anterior al permiso de publicación. Reconectá para otorgarlo y
+            programar desde acá.
+          </p>
+          <div className="mt-4">
+            <Button variant="primary" size="md" onClick={connect} disabled={busy}>
+              {busy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" /> Conectando…
+                </>
+              ) : (
+                "Otorgar permiso de publicación"
+              )}
+            </Button>
+          </div>
+        </>
+      )}
+
+      {state.status === "conectado" && state.profile.can_publish !== false && (
         <>
           <p className="mt-3 text-sm text-zinc-200">
             <span className="font-semibold text-white">@{state.profile.username}</span>
@@ -143,10 +186,11 @@ export function InstagramCard({
                 · {state.profile.followers_count} seguidores
               </span>
             )}
+            {quota && <span className="text-zinc-500"> · cuota {quota}</span>}
           </p>
           <p className="mt-1 text-xs text-zinc-500">
-            La publicación automática llega tras la aprobación de Meta. Por ahora: copiá y
-            exportá tus borradores.
+            Podés publicar y programar desde la sección “Programadas”. Nada sale sin que lo
+            apruebes vos.
           </p>
           <div className="mt-4">
             <Button variant="ghost" size="sm" onClick={disconnect} disabled={busy}>

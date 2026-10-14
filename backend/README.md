@@ -16,6 +16,18 @@ uv run dev.py   # dev server con reload en 127.0.0.1:8080 (ver dev.py)
   + `zone` + `sales_channel` (`local|online|mixto`). Sin `business_name` → 422;
   si el comercio no se encuentra en Maps → 404 (nunca fixtures silenciosas).
 
+## Migraciones (Alembic, manual)
+
+El DDL vive versionado en `migrations/versions/` (SQL crudo, sin ORM).
+El servidor **nunca** migra solo: cada entorno aplica a mano desde `backend/`:
+
+```powershell
+uv run alembic upgrade head   # ver estado: uv run alembic history
+```
+
+Nueva migración: `uv run alembic revision -m "descripcion"` y completar
+`upgrade()`/`downgrade()` con SQL. Regla: una sola historia lineal, un head.
+
 ## Cuidar cuota ($20)
 
 - Límites en `src/config.py`: `max_competitors=10`, `max_reviews_per_place=20`,
