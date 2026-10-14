@@ -27,21 +27,21 @@ export default function UserMenu({ user }: { user: MenuUser }) {
     <div className="flex items-center gap-3">
       {user.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={user.image} alt="" className="h-8 w-8 rounded-full" />
+        <img src={user.image} alt="" className="h-8 w-8 rounded-full ring-1 ring-white/15" />
       ) : (
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-sm font-semibold text-zinc-700 dark:bg-zinc-700 dark:text-zinc-200">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FF5C00]/15 text-sm font-semibold text-[#FFB25C] ring-1 ring-[#FF5C00]/30">
           {initial}
         </span>
       )}
-      <div className="min-w-0 leading-tight">
-        <p className="truncate text-sm font-medium">{user.name ?? "Mi cuenta"}</p>
+      <div className="hidden min-w-0 leading-tight sm:block">
+        <p className="truncate text-sm font-medium text-white">{user.name ?? "Mi cuenta"}</p>
         {user.email && <p className="truncate text-xs text-zinc-500">{user.email}</p>}
       </div>
       <button
         type="button"
         onClick={logout}
         disabled={loading}
-        className="rounded-lg border border-zinc-300 px-3 py-1.5 text-sm disabled:opacity-50 dark:border-zinc-700"
+        className="rounded-full border border-white/10 px-3 py-1.5 text-sm text-zinc-300 transition-colors hover:border-[#FF5C00]/50 hover:text-white disabled:opacity-50"
       >
         {loading ? "Saliendo…" : "Salir"}
       </button>

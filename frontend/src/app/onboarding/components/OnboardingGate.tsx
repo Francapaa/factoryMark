@@ -2,8 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { RotateCcw } from "lucide-react";
 import { AuthRequiredError } from "@/lib/api";
 import { getMyBusiness } from "@/lib/businesses";
+import { Button } from "@/components/ui/button";
 
 /** Gate del lado cliente: con negocio guardado redirige a /dashboard (1 perfil = 1 local). */
 export default function OnboardingGate({ children }: { children: React.ReactNode }) {
@@ -38,25 +40,33 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
 
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-3 py-6 text-center">
-        <p className="text-sm text-zinc-500">{error}</p>
-        <button
+      <div className="flex flex-col items-center gap-4 py-8 text-center">
+        <p className="rounded-2xl border border-[#FF5C00]/25 bg-[#FF5C00]/5 p-4 text-sm leading-relaxed text-zinc-300">
+          {error}
+        </p>
+        <Button
           type="button"
+          variant="primary"
+          size="md"
           onClick={() => {
             setChecked(false);
             setError("");
             setAttempt((n) => n + 1);
           }}
-          className="rounded-lg bg-black px-5 py-2 font-medium text-white dark:bg-white dark:text-black"
         >
-          Reintentar
-        </button>
+          <RotateCcw className="h-4 w-4" /> Reintentar
+        </Button>
       </div>
     );
   }
 
   if (!checked) {
-    return <p className="py-6 text-center text-sm text-zinc-500">Verificando tu negocio…</p>;
+    return (
+      <div className="flex flex-col items-center gap-4 py-10 text-center" aria-live="polite">
+        <span className="h-11 w-11 animate-pulse rounded-2xl bg-[#FF5C00]/20 shadow-[0_0_24px_rgba(255,92,0,0.35)]" />
+        <p className="text-sm text-zinc-500">Verificando tu negocio…</p>
+      </div>
+    );
   }
   return <>{children}</>;
 }
