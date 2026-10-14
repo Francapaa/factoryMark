@@ -1,4 +1,4 @@
-"""Tests publisher mock + endpoint /api/approve. Cero red."""
+"""Publisher + approve E2E: draft real y golden_set ejecutado, no solo forma."""
 
 import json
 from pathlib import Path
@@ -35,9 +35,18 @@ def test_approve_endpoint(monkeypatch):
     assert r.status_code == 200 and r.json()["status"] == "rejected"
 
 
-def test_golden_set_valido():
-    cases = json.loads((Path(__file__).resolve().parents[2] / "eval" / "golden_set.json").read_text(encoding="utf-8"))
+def test_golden_set_genera_drafts_reales():
+    """E2E sobre eval/golden_set.json: cada caso produce draft con marca y hashtags.
+
+    Mutación: si build_draft deja de usar brand name, falla.
+    """
+    cases = json.loads(
+        (Path(__file__).resolve().parents[2] / "eval" / "golden_set.json").read_text(encoding="utf-8")
+    )
     assert len(cases) >= 5
     for c in cases:
-        assert {"id", "business_name", "business_type", "zone", "sales_channel", "expected_insight"} <= set(c)
         assert c["sales_channel"] in ("local", "online", "mixto")
+        draft = build_draft(c["expected_insight"], {"name": c["business_name"], "tone": "cercano"})
+        assert draft.status == "draft"
+        assert c["business_name"].split()[0] in draft.copy_text
+        assert len(draft.hashtags) > 0

@@ -341,3 +341,55 @@ Definir un **costo máximo por negocio por mes** y medirlo desde el primer usuar
 - **Brand kit:** colores, tono, logo y tipografía del negocio.
 - **Escena (JSON):** descripción estructurada de un video que el backend valida y renderiza con una plantilla.
 - **Remotion:** herramienta para crear videos con código (React).
+
+---
+
+## 14. Testing sin slop (integración-first)
+
+> `Write tests. Not too many. Mostly integration.` Los tests se ejercitan
+> desde el nivel más alto posible (HTTP + DB real), con mocks solo en el
+> borde externo (Google Maps, Tavily, Meta, JWKS).
+
+### 14.1 Reglas duras
+
+1. **Prohibido mockear storage.** Nada de `monkeypatch db.get_my_business`,
+   `db.save_my_business`, `places.resolve_anchor`, `run_analysis`,
+   `fetch_photo_bytes` con lambdas. O DB real (Postgres efímera vía
+   `DATABASE_URL`), o función pura sin side-effects.
+2. **Integración/E2E por default.** Todo lo demás se testea vía `TestClient`
+   + DB real + `httpx.MockTransport` en el borde. Unitarios solo para lógica
+   pura (`strategist`, `nlp/*`, `video/scene`, validadores).
+3. **Borde externo con `httpx.MockTransport`, nunca `patch` interno.**
+   `places/*`, `tavily/*`, `instagram/*` aceptan `client=` inyectable; los
+   endpoints que no lo pasan se mockean a nivel `httpx.Client`/`httpx.get`
+   (HTTP real simulado), no la función de dominio.
+4. **Sin change-detectors.** Prohibido asertar `call_count`, SQL interno,
+   orden de queries o manipular `_mem_posts` / `_store` directo. Asertar
+   comportamiento observable: status HTTP + JSON + `SELECT` real o `GET`
+   posterior.
+5. **DAMP, no DRY.** Helpers explícitos (`new_business()`, `_mock_graph()`)
+   por archivo. Cada test se lee solo. Table-driven solo si el cuerpo es
+   idéntico.
+6. **Cada test nombra su mutación.** Antes de escribirlo: "si comento la
+   validación X, este test debe fallar con Y". Si no podés nombrarla, no lo
+   escribas. Después de escribirlo, rompé `src/` a mano y verificá que falla.
+
+### 14.2 Dónde sí se permite falsear
+
+- **HTTP externo:** `httpx.MockTransport(handler)` con payloads mínimos +
+  `cache_dir=tmp_path` (nunca `backend/data/cache` real).
+- **Auth:** JWT real firmado local (EdDSA) + `_FakeJwksClient` en borde.
+  Los 401 (issuer/aud/exp/opaco) deben rechazar **antes de tocar la DB**
+  (asertar con `_no_db` que levanta si se toca storage).
+- **DB ausente:** solo se testea el `503` explícito (`DATABASE_URL` vacía).
+  Todo lo demás con `DATABASE_URL` real lleva `pytest.mark.skipif` si falta.
+- **Cola IG sin DB:** se testea el fallback de prod vía API (crear → listar →
+  `run-due` con `programada_para` a 2-3s futuro + `sleep`), nunca insertando
+  en `_mem_posts` a mano.
+
+### 14.3 Verificación antes de entregar
+
+1. `grep -r "db\.get_my_business\|db\.save_my_business\|places\.resolve_anchor\|run_analysis.*fake\|_mem_posts\[" backend/tests` da 0 hits (salvo `_no_db` documentado).
+2. `uv run pytest -q` en verde con y sin `DATABASE_URL` (los que requieren
+   DB hacen `skip`, no `fail`).
+3. Ningún test escribe en `backend/data/cache`.

@@ -139,36 +139,32 @@ def test_scheduled_crud(monkeypatch):
 
 
 def test_scheduled_publish_now_y_run_due(monkeypatch):
+    """E2E vía API: futura (publish-now la adelanta) + vencida por tiempo real.
+
+    Mutación: si run-due no filtra por programada_para <= now, revisados != 1.
+    """
+    import time
+
     _connect()
     _mock_graph(monkeypatch)
-    # Una futura (publish-now la adelanta) y una vencida a mano en memoria.
     r = client.post(
         "/api/instagram/scheduled",
         json={"image_url": IMG, "caption": "Futura", "programada_para": _future()},
     )
     future_id = r.json()["id"]
-    past_id = "00000000-0000-0000-0000-000000000001"
-    igapi._mem_posts.setdefault("dev-user", {})[past_id] = {
-        "id": past_id,
-        "owner_id": "dev-user",
-        "copy_text": "",
-        "hashtags": [],
-        "image_url": IMG,
-        "caption": "Vencida",
-        "estado": "programado",
-        "programada_para": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
-        "container_id": None,
-        "external_id": None,
-        "error": None,
-        "created_at": datetime.now(UTC).isoformat(),
-        "updated_at": datetime.now(UTC).isoformat(),
-        "published_at": None,
-    }
+    # Vencida real: programada a 2s futuro, esperamos a que venza (sin tocar _mem_posts).
+    soon = (datetime.now(UTC) + timedelta(seconds=2)).isoformat()
+    r = client.post(
+        "/api/instagram/scheduled",
+        json={"image_url": IMG, "caption": "Vencida", "programada_para": soon},
+    )
+    assert r.status_code == 200, r.text
     # Publish-now sobre la futura
     r = client.post(f"/api/instagram/scheduled/{future_id}/publish-now")
     assert r.status_code == 200, r.text
     assert r.json()["media_id"] == "media-1"
-    # Run-due publica solo la vencida
+    # Esperar vencimiento y correr worker: publica solo la vencida
+    time.sleep(3)
     r = client.post("/api/instagram/scheduled/run-due")
     assert r.status_code == 200, r.text
     body = r.json()
@@ -179,6 +175,12 @@ def test_scheduled_publish_now_y_run_due(monkeypatch):
 
 
 def test_run_due_marca_error_si_meta_falla(monkeypatch):
+    """E2E vía API: vencida real + Meta 400 -> estado error con mensaje.
+
+    Mutación: si _mark_error no persiste, el GET seguiría en programado.
+    """
+    import time
+
     _connect()
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -192,27 +194,19 @@ def test_run_due_marca_error_si_meta_falla(monkeypatch):
     monkeypatch.setattr(
         "instagram.httpx.Client", lambda *a, **k: real_client(transport=transport)
     )
-    past_id = "00000000-0000-0000-0000-000000000002"
-    igapi._mem_posts.setdefault("dev-user", {})[past_id] = {
-        "id": past_id,
-        "owner_id": "dev-user",
-        "copy_text": "",
-        "hashtags": [],
-        "image_url": IMG,
-        "caption": "Rota",
-        "estado": "programado",
-        "programada_para": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
-        "container_id": None,
-        "external_id": None,
-        "error": None,
-        "created_at": datetime.now(UTC).isoformat(),
-        "updated_at": datetime.now(UTC).isoformat(),
-        "published_at": None,
-    }
+    soon = (datetime.now(UTC) + timedelta(seconds=2)).isoformat()
+    r = client.post(
+        "/api/instagram/scheduled",
+        json={"image_url": IMG, "caption": "Rota", "programada_para": soon},
+    )
+    assert r.status_code == 200, r.text
+    post_id = r.json()["id"]
+    time.sleep(3)
     r = client.post("/api/instagram/scheduled/run-due")
     assert r.status_code == 200
     body = r.json()
     assert body["publicados"] == 0 and len(body["errores"]) == 1
     listed = client.get("/api/instagram/scheduled").json()
-    assert listed[0]["estado"] == "error"
-    assert listed[0]["error"]
+    row = next(p for p in listed if p["id"] == post_id)
+    assert row["estado"] == "error"
+    assert row["error"]
