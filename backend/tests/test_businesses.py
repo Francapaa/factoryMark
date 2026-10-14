@@ -266,11 +266,14 @@ def test_storage_roundtrip_postgres_real():
     from pathlib import Path
 
     import psycopg
+    from alembic import command
+    from alembic.config import Config
 
-    schema = Path(__file__).resolve().parents[1] / "schema.sql"
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
-        conn.execute(schema.read_text(encoding="utf-8"))
-        conn.commit()
+    cfg = Config()
+    cfg.set_main_option(
+        "script_location", str(Path(__file__).resolve().parents[1] / "migrations")
+    )
+    command.upgrade(cfg, "head")
     saved = db.save_my_business(
         "owner-test",
         name="Café Test",

@@ -44,6 +44,7 @@ export type IGProfile = {
   username: string;
   followers_count?: number;
   media_count?: number;
+  can_publish?: boolean;
 };
 
 export type IGState =
@@ -54,7 +55,6 @@ export type IGState =
   | { status: "error"; message: string };
 
 export type PostState = "borrador" | "aprobado" | "programado" | "publicado" | "rechazado";
-
 export type DashboardPost = {
   id: string;
   state: PostState;
@@ -62,6 +62,22 @@ export type DashboardPost = {
   hashtags: string[];
   media_url?: string | null;
   external_id?: string | null;
+};
+
+/** Programada de Instagram (contrato con GET/POST /api/instagram/scheduled). */
+export type ScheduledPost = {
+  id: string;
+  estado: string;
+  image_url: string;
+  caption: string;
+  copy_text: string;
+  hashtags: string[];
+  programada_para: string | null;
+  container_id: string | null;
+  external_id: string | null;
+  error: string | null;
+  created_at: string | null;
+  published_at: string | null;
 };
 
 export type DashboardState = {

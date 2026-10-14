@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     # Solo desarrollo local sin Neon: saltea la verificación (nunca en prod)
     auth_disabled: bool = False
 
-    # Neon Postgres (negocio del dueño, ver backend/schema.sql)
+    # Neon Postgres (negocio del dueño, DDL en backend/migrations)
     database_url: str = ""
 
     # Límites para no quemar cuota de Google Places
@@ -43,7 +43,9 @@ class Settings(BaseSettings):
     # falta el que estés usando en la barra de direcciones).
     frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
-    # Instagram-Login v1 (conectar + leer perfil; publicar = milestone post-App-Review)
+    # Instagram-Login v2 (conectar + publicar + programar, ruta sin Facebook Page)
+    # Scopes: instagram_business_basic + instagram_business_content_publish.
+    # Sin DATABASE_URL todo vive en memoria; con DB el token va cifrado.
     instagram_client_id: str = ""
     instagram_client_secret: str = ""
     instagram_redirect_uri: str = ""
