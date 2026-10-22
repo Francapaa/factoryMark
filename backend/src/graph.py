@@ -35,15 +35,26 @@ def build_graph():
 graph = build_graph()
 
 
-def run_analysis(business_name: str, business_type: str, zone: str, sales_channel: str = "local") -> dict:
+def run_analysis(
+    business_name: str,
+    business_type: str,
+    zone: str,
+    sales_channel: str = "local",
+    *,
+    refresh_places: bool = False,
+) -> dict:
     result = graph.invoke(
         {
             "business_name": business_name,
             "business_type": business_type,
             "zone": zone,
             "sales_channel": sales_channel,
+            "refresh_places": refresh_places,
         }
     )
+    scores = result.get("scores") or {}
+    for comp in result.get("competitors", []):
+        comp["score"] = scores.get(comp.get("place_id"))
     meta = result.get("meta") or {}
     meta.setdefault("stub", True)
     meta["trace"] = result.get("trace", [])

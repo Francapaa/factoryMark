@@ -3,7 +3,8 @@
 Enfocado en dolor rival: los elogios no generan oportunidades, solo sirven
 de contexto. Tres señales, en orden de peso:
 
-1. Cluster negativo (sentimiento < -0.2, >= 2 menciones) → dolor temático.
+1. Cluster negativo con tema (los "general" van a las reglas por categoría)
+   → dolor temático.
 2. Dolor por categoría ES+EN (espera, precio, servicio, calidad, limpieza)
    sobre reviews con señal negativa (sentiment < -0.2 o rating <= 2):
    >= 2 menciones de la misma categoría → oportunidad accionable.
@@ -22,7 +23,9 @@ Toda cita dice a qué negocio pertenece ("— Café B") y con qué estrellas.
 
 from __future__ import annotations
 
+import hashlib
 import re
+import unicodedata
 
 from nlp.sentiment import score_sentiment
 
@@ -46,6 +49,18 @@ _PAIN_RES = {name: re.compile(pat, re.IGNORECASE) for name, pat in _PAIN_CATEGOR
 
 def _confidence(count: int) -> str:
     return "alta" if count >= 5 else "media"
+
+
+def _slug(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
+    slug = re.sub(r"[^a-z0-9]+", "-", ascii_value.lower()).strip("-")
+    return slug or "sin-tema"
+
+
+def _review_key(place_id: str, text: str) -> str:
+    digest = hashlib.sha1(text.strip().lower().encode("utf-8")).hexdigest()[:12]
+    return f"review:{_slug(place_id)}:{digest}"
 
 
 def _place_names(state: dict) -> dict[str, str]:
@@ -77,12 +92,18 @@ def _cluster_pains(state: dict, opportunities: list[dict]) -> set[str]:
     """Dolor temático por cluster. Devuelve los textos ya citados."""
     cited: set[str] = set()
     for cluster in state.get("clusters", []):
+        # Un cluster "general" agrupa reviews sin tema común. Si lo citamos acá,
+        # todas las corridas comparten `cluster:general` y nunca detectamos una
+        # oportunidad nueva; conviene dejar que decidan las reglas por categoría.
+        if not cluster.get("topic") or _slug(cluster["topic"]) == "general":
+            continue
         if cluster["avg_sentiment"] < _NEGATIVE_THRESHOLD and cluster["count"] >= _MIN_COUNT:
             examples = [t.strip() for t in cluster.get("example_texts", []) if t.strip()]
             cited.update(examples)
             shown = "; ".join(e.replace("\n", " ") for e in examples[:_MAX_EXAMPLES])
             opportunities.append(
                 {
+                    "key": f"cluster:{_slug(cluster['topic'])}",
                     "title": f"Oportunidad en '{cluster['topic']}'",
                     "evidence": (
                         f"{cluster['count']} menciones con sentimiento "
@@ -136,6 +157,7 @@ def _category_pains(
             )
             opportunities.append(
                 {
+                    "key": f"category:{_slug(name)}",
                     "title": f"Dolor rival: {name} ({len(hits)} menciones)",
                     "evidence": (
                         f"{len(hits)} menciones con señal negativa sobre {name}. Ej: {shown}"
@@ -157,6 +179,7 @@ def _low_rating_pains(
         )
         opportunities.append(
             {
+                "key": "rating:low",
                 "title": f"Dolor rival: {len(lows)} reviews de 1-2 estrellas",
                 "evidence": (
                     f"{len(lows)} menciones con rating ≤ {_LOW_RATING} estrellas. Ej: {shown}"
@@ -175,6 +198,7 @@ def _general_pains(pains: list[dict], opportunities: list[dict], names: dict[str
         business = names.get(pain["place_id"], pain["place_id"])
         opportunities.append(
             {
+                "key": _review_key(pain["place_id"], pain["text"]),
                 "title": f"Reseña{_stars(pain['rating'])} · {business}",
                 "evidence": pain["text"].replace("\n", " "),
                 "confidence": "media",
@@ -190,17 +214,21 @@ def strategist_node(state: dict) -> dict:
     leftovers = _category_pains(pains, opportunities, names)
     _low_rating_pains(leftovers, opportunities, names)
     _general_pains(pains, opportunities, names)
-    # Seguridad: dos cards nunca comparten la misma evidencia textual.
-    seen: set[str] = set()
+    # Seguridad: dos cards nunca comparten la misma evidencia textual ni la misma key.
+    seen_evidence: set[str] = set()
+    seen_keys: set[str] = set()
     unique: list[dict] = []
     for opp in opportunities:
-        if opp["evidence"] not in seen:
-            seen.add(opp["evidence"])
-            unique.append(opp)
+        if opp["evidence"] in seen_evidence or opp["key"] in seen_keys:
+            continue
+        seen_evidence.add(opp["evidence"])
+        seen_keys.add(opp["key"])
+        unique.append(opp)
     opportunities = unique
     if not opportunities:
         opportunities.append(
             {
+                "key": "none",
                 "title": "Sin gaps claros en los datos actuales",
                 "evidence": "Ningún cluster negativo con volumen suficiente.",
                 "confidence": "baja",

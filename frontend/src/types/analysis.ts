@@ -4,10 +4,21 @@ export type AnalysisStatus = "idle" | "loading" | "done" | "error";
 
 export type SalesChannel = "local" | "online" | "mixto";
 
+export type AnalysisInfo = {
+  id: string;
+  analyzed_at: string;
+  competitors_count: number;
+  opportunities_count: number;
+  new_competitors: number;
+  new_opportunities: number;
+};
+
 export type Opportunity = {
+  key: string;
   title: string;
   evidence: string;
   confidence: string;
+  is_new?: boolean;
 };
 
 export type Draft = {
@@ -25,6 +36,9 @@ export type Competitor = {
   cached: boolean;
   source?: string;
   distance_m?: number | null;
+  website?: string;
+  score?: number | null;
+  is_new?: boolean;
 };
 
 export type AnalyzeResult = {
@@ -32,6 +46,7 @@ export type AnalyzeResult = {
   opportunities: Opportunity[];
   draft_post: Draft | null;
   meta: Record<string, unknown>;
+  analysis?: AnalysisInfo | null;
 };
 
 export type AnalyzeFormState = {

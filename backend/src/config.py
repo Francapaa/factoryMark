@@ -22,11 +22,14 @@ class Settings(BaseSettings):
 
     # Neon Postgres (negocio del dueño, DDL en backend/migrations)
     database_url: str = ""
+    # Solo tests: base separada de la de producción (nunca se usa en runtime)
+    test_database_url: str = ""
 
     # Límites para no quemar cuota de Google Places
     max_competitors: int = 10
     max_reviews_per_place: int = 20
     places_cache_ttl_hours: int = 168  # 7 días: reutilizar todo lo posible
+    places_cache_dir: str = ""  # override opcional (tests, contenedores)
     places_language: str = "es"
     # Radio de búsqueda por proximidad (modo local), en metros
     search_radius_m: int = 1000

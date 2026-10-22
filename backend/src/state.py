@@ -12,6 +12,8 @@ class AnalyzeRequest(BaseModel):
     zone: str = Field(min_length=1, examples=["Palermo Soho, Buenos Aires"])
     sales_channel: Literal["local", "online", "mixto"] = "local"
     language: str = "es"
+    # true = ignora la caché de disco y consulta Google Places/Tavily en vivo
+    refresh_places: bool = False
 
 
 class Anchor(BaseModel):
@@ -39,6 +41,8 @@ class Competitor(BaseModel):
     reviews_fetched: int = 0
     latitude: float | None = None
     longitude: float | None = None
+    score: float | None = None
+    is_new: bool = False
 
 
 class WebSignal(BaseModel):
@@ -59,9 +63,11 @@ class ReviewCluster(BaseModel):
 
 
 class Opportunity(BaseModel):
+    key: str
     title: str
     evidence: str
     confidence: Literal["alta", "media", "baja"] = "media"
+    is_new: bool = False
 
 
 class DraftPost(BaseModel):
@@ -71,9 +77,19 @@ class DraftPost(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class AnalysisInfo(BaseModel):
+    id: str
+    analyzed_at: str
+    competitors_count: int = 0
+    opportunities_count: int = 0
+    new_competitors: int = 0
+    new_opportunities: int = 0
+
+
 class AnalyzeResponse(BaseModel):
     competitors: list[Competitor] = []
     clusters: list[ReviewCluster] = []
     opportunities: list[Opportunity] = []
     draft_post: DraftPost | None = None
     meta: dict = {}
+    analysis: AnalysisInfo | None = None

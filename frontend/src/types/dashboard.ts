@@ -4,7 +4,7 @@
  * define sus propios types de estado — los importa de este módulo.
  */
 
-import type { AnalyzeResult, Competitor, Opportunity } from "./analysis";
+import type { AnalysisInfo, AnalyzeResult, Competitor, Opportunity } from "./analysis";
 import type { MyBusiness } from "@/lib/businesses";
 
 /** Snapshot del ancla con tipos estrechos (el contrato trae Record<string, unknown>). */
@@ -23,10 +23,7 @@ export function snapshotOf(business: MyBusiness): AnchorSnapshotView {
   };
 }
 
-export type CompetitorWithScore = Competitor & {
-  score?: number | null;
-  website?: string;
-};
+export type CompetitorWithScore = Competitor;
 
 export type AnalyzeResultWithScore = Omit<AnalyzeResult, "competitors"> & {
   competitors: CompetitorWithScore[];
@@ -88,6 +85,11 @@ export type DashboardState = {
   opportunities: Opportunity[];
   draft: DashboardPost | null;
   searched: boolean;
+  analysis: AnalysisInfo | null;
+  analysisLoading: boolean;
+  refreshing: boolean;
+  refreshError: string;
+  retry: "load" | "analyze";
   ig: IGState;
 };
 
@@ -96,23 +98,34 @@ export type DashboardAction =
   | { type: "business/loaded"; business: MyBusiness }
   | { type: "business/missing" }
   | { type: "business/error" }
-  | { type: "comp/set"; state: CompetitorsState }
+  | { type: "analysis/loading" }
+  | { type: "analysis/empty" }
+  | { type: "analysis/analyzing" }
+  | { type: "analysis/refreshing" }
   | {
       type: "analysis/success";
+      analysis: AnalysisInfo | null;
       competitors: CompetitorWithScore[];
       opportunities: Opportunity[];
       draft: DashboardPost | null;
     }
+  | { type: "analysis/load-error"; message: string; retry: "load" | "analyze" }
+  | { type: "analysis/refresh-error"; message: string }
   | { type: "ig/set"; state: IGState };
 
 export const initialDashboardState: DashboardState = {
   business: null,
   businessLoading: true,
   businessMissing: false,
-  comp: { status: "idle" },
+  comp: { status: "loading" },
   opportunities: [],
   draft: null,
   searched: false,
+  analysis: null,
+  analysisLoading: true,
+  refreshing: false,
+  refreshError: "",
+  retry: "load",
   ig: { status: "loading" },
 };
 
@@ -144,8 +157,44 @@ export function dashboardReducer(
         businessLoading: false,
         businessMissing: false,
       };
-    case "comp/set":
-      return { ...state, comp: action.state };
+    case "analysis/loading":
+      return {
+        ...state,
+        comp: { status: "loading" },
+        analysisLoading: true,
+        refreshing: false,
+        refreshError: "",
+        retry: "load",
+      };
+    case "analysis/empty":
+      return {
+        ...state,
+        comp: { status: "idle" },
+        opportunities: [],
+        draft: null,
+        searched: false,
+        analysis: null,
+        analysisLoading: false,
+        refreshing: false,
+        refreshError: "",
+        retry: "load",
+      };
+    case "analysis/analyzing":
+      return {
+        ...state,
+        comp: { status: "loading" },
+        analysisLoading: false,
+        refreshing: false,
+        refreshError: "",
+        retry: "analyze",
+      };
+    case "analysis/refreshing":
+      return {
+        ...state,
+        refreshing: true,
+        refreshError: "",
+        retry: "analyze",
+      };
     case "analysis/success":
       return {
         ...state,
@@ -153,6 +202,25 @@ export function dashboardReducer(
         opportunities: action.opportunities,
         draft: action.draft,
         searched: true,
+        analysis: action.analysis,
+        analysisLoading: false,
+        refreshing: false,
+        refreshError: "",
+        retry: "load",
+      };
+    case "analysis/load-error":
+      return {
+        ...state,
+        comp: { status: "error", message: action.message },
+        analysisLoading: false,
+        refreshing: false,
+        retry: action.retry,
+      };
+    case "analysis/refresh-error":
+      return {
+        ...state,
+        refreshing: false,
+        refreshError: action.message,
       };
     case "ig/set":
       return { ...state, ig: action.state };

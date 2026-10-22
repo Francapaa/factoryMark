@@ -11,6 +11,7 @@ class AgentState(TypedDict, total=False):
     business_type: str
     zone: str
     sales_channel: str
+    refresh_places: bool
     anchor: dict | None
     competitors: list[dict]
     reviews_by_place: dict[str, list[str]]
@@ -21,4 +22,5 @@ class AgentState(TypedDict, total=False):
     scores: dict[str, float]
     opportunities: list[dict]
     draft_post: dict | None
+    meta: dict
     trace: Annotated[list[str], operator.add]
