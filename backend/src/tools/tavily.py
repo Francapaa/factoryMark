@@ -57,11 +57,13 @@ def search_web_signals(
     *,
     client: httpx.Client | None = None,
     cache_dir: Path | None = None,
+    refresh: bool = False,
 ) -> list[dict]:
     """Una query a Tavily. Devuelve señales {url,title,snippet,published_date,query}.
 
     Sin key → RuntimeError (el caller decide si Tavily es obligatorio u opcional
-    según el canal). Cache hit → cero llamadas pagas.
+    según el canal). Cache hit → cero llamadas pagas. `refresh=True` ignora la
+    caché de lectura y consulta la API.
     """
     import json
     from datetime import UTC, datetime
@@ -74,7 +76,7 @@ def search_web_signals(
     cdir = cache_dir or default_cache_dir()
     cpath = cdir / f"tavily_{tavily_cache_key(query, max_results)}.json"
 
-    hit = _read_signals_cache(cpath, settings.tavily_cache_ttl_hours)
+    hit = None if refresh else _read_signals_cache(cpath, settings.tavily_cache_ttl_hours)
     if hit is not None:
         return hit
 

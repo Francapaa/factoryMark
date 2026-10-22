@@ -38,6 +38,8 @@ class AnchorNotFoundError(RuntimeError):
 
 
 def default_cache_dir() -> Path:
+    if settings.places_cache_dir:
+        return Path(settings.places_cache_dir)
     # backend/src/tools/places.py -> parents[2] == backend/
     return Path(__file__).resolve().parents[2] / "data" / "cache"
 
@@ -129,11 +131,13 @@ def search_competitors(
     client: httpx.Client | None = None,
     cache_dir: Path | None = None,
     location_bias: dict | None = None,
+    refresh: bool = False,
 ) -> list[Competitor]:
     """Busca competidores. Cache hit → sin llamadas pagas (cached=True).
 
     `location_bias`: {"latitude": float, "longitude": float, "radius_m": int}
     para buscar por cercanía al comercio ancla (modo local).
+    `refresh=True` ignora la caché de lectura y consulta la API.
     """
     api_key = settings.google_places_api_key
     if not api_key:
@@ -150,7 +154,7 @@ def search_competitors(
     cdir = cache_dir or default_cache_dir()
     cpath = cdir / f"{cache_key(business_type + bias_sig, zone, language)}.json"
 
-    hit = _read_cache(cpath, settings.places_cache_ttl_hours)
+    hit = None if refresh else _read_cache(cpath, settings.places_cache_ttl_hours)
     if hit is not None:
         return _to_competitors(hit, cached=True)
 
@@ -192,11 +196,13 @@ def resolve_anchor(
     *,
     client: httpx.Client | None = None,
     cache_dir: Path | None = None,
+    refresh: bool = False,
 ) -> Anchor:
     """Resuelve el comercio específico a un ancla con coordenadas.
 
     Reusa Places Search (sin Geocoding API: otro SKU facturable innecesario).
     Lanza AnchorNotFoundError si no hay match: error explícito, nunca fixtures.
+    `refresh=True` ignora la caché de lectura y consulta la API.
     """
     api_key = settings.google_places_api_key
     if not api_key:
@@ -206,7 +212,7 @@ def resolve_anchor(
     cdir = cache_dir or default_cache_dir()
     cpath = cdir / f"anchor_{cache_key(business_name, zone, language)}.json"
 
-    hit = _read_cache(cpath, settings.places_cache_ttl_hours)
+    hit = None if refresh else _read_cache(cpath, settings.places_cache_ttl_hours)
     raw_list = hit
     if raw_list is None:
         own_client = client is None
@@ -272,12 +278,14 @@ def fetch_place_details(
     *,
     client: httpx.Client | None = None,
     cache_dir: Path | None = None,
+    refresh: bool = False,
 ) -> dict:
     """Details por lugar: reviews, horarios, fotos, website. Cache 7 días.
 
     Devuelve dict normalizado:
     {"place_id", "reviews": [{"text","author","rating","published_at"}],
      "opening_hours": [...], "photos": [...], "website": str}
+    `refresh=True` ignora la caché de lectura y consulta la API.
     """
     api_key = settings.google_places_api_key
     if not api_key:
@@ -286,11 +294,13 @@ def fetch_place_details(
     language = settings.places_language
     cdir = cache_dir or default_cache_dir()
     cpath = cdir / f"details_{place_id}_{language}.json"
-    hit = _read_cache(cpath, settings.places_cache_ttl_hours)
-    if hit is None:
-        # Formato anterior (sin idioma): reutilizar si está fresco para no
-        # gastar cuota por el cambio de formato de caché.
-        hit = _read_cache(cdir / f"details_{place_id}.json", settings.places_cache_ttl_hours)
+    hit = None
+    if not refresh:
+        hit = _read_cache(cpath, settings.places_cache_ttl_hours)
+        if hit is None:
+            # Formato anterior (sin idioma): reutilizar si está fresco para no
+            # gastar cuota por el cambio de formato de caché.
+            hit = _read_cache(cdir / f"details_{place_id}.json", settings.places_cache_ttl_hours)
     data = hit[0] if hit else None
     if not isinstance(data, dict):
         own_client = client is None

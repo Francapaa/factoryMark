@@ -1,6 +1,4 @@
-"""Tests del onboarding: resolve, save/mine, gate 409, photo proxy. Cero red real."""
-
-import os
+"""Tests del onboarding: resolve, save/mine, photo proxy. Cero red real."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,22 +33,6 @@ def as_user():
 
     yield _as
     app.dependency_overrides.clear()
-
-
-def _saved(owner_id: str = "dev-user") -> dict:
-    return {
-        "id": "b1",
-        "owner_id": owner_id,
-        "name": "Café Martínez",
-        "business_type": "café de especialidad",
-        "sales_channel": "local",
-        "zone": "Palermo Soho",
-        "anchor_place_id": "anchor1",
-        "anchor_snapshot": {"address": "Calle Falsa 123"},
-        "brand_kit": None,
-        "created_at": None,
-        "updated_at": None,
-    }
 
 
 # --- resolve ---
@@ -186,60 +168,6 @@ def test_health_reporta_db_configured(monkeypatch):
     assert client.get("/health").json()["db_configured"] is True
 
 
-# --- gate /api/analyze ---
-
-
-def test_analyze_sin_onboarding_409(anon, monkeypatch):
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: None)
-    r = client.post(
-        "/api/analyze",
-        json={
-            "business_name": "Café Ejemplo",
-            "business_type": "café",
-            "zone": "Palermo Soho",
-            "sales_channel": "local",
-        },
-    )
-    assert r.status_code == 409
-    assert r.json()["detail"]["code"] == "onboarding_incompleto"
-
-
-def test_analyze_con_negocio_usa_datos_guardados(anon, monkeypatch):
-    monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
-    seen = {}
-
-    from api import analysis as analysis_module
-
-    def fake_run(name, btype, zone, channel="local"):
-        seen.update(name=name, btype=btype, zone=zone, channel=channel)
-        return {
-            "competitors": [],
-            "clusters": [],
-            "opportunities": [],
-            "draft_post": None,
-            "meta": {},
-        }
-
-    monkeypatch.setattr(analysis_module, "run_analysis", fake_run)
-    r = client.post(
-        "/api/analyze",
-        json={
-            "business_name": "Otro tipeado (sin confirmar)",
-            "business_type": "bar",
-            "zone": "Belgrano",
-            "sales_channel": "online",
-        },
-    )
-    assert r.status_code == 200
-    # El run usa lo guardado/confirmado, no el input sin confirmar.
-    assert seen == {
-        "name": "Café Martínez",
-        "btype": "café de especialidad",
-        "zone": "Palermo Soho",
-        "channel": "local",
-    }
-
-
 # --- photo proxy ---
 
 
@@ -256,36 +184,3 @@ def test_photo_ok_sirve_bytes_sin_key(anon, monkeypatch):
     assert r.status_code == 200
     assert r.content == b"fake-bytes"
     assert "GOOGLE_PLACES_API_KEY" not in r.text
-
-
-# --- storage real (solo con DATABASE_URL efímera) ---
-
-
-@pytest.mark.skipif(not os.getenv("DATABASE_URL"), reason="requiere Postgres efímera")
-def test_storage_roundtrip_postgres_real():
-    from pathlib import Path
-
-    import psycopg
-    from alembic import command
-    from alembic.config import Config
-
-    cfg = Config()
-    cfg.set_main_option(
-        "script_location", str(Path(__file__).resolve().parents[1] / "migrations")
-    )
-    command.upgrade(cfg, "head")
-    saved = db.save_my_business(
-        "owner-test",
-        name="Café Test",
-        business_type="café",
-        sales_channel="local",
-        zone="Palermo",
-        anchor_place_id="p-test",
-        anchor_snapshot={"address": "Calle 1"},
-    )
-    assert saved["anchor_place_id"] == "p-test"
-    assert db.get_my_business("owner-test")["name"] == "Café Test"
-    assert db.get_my_business("otro-owner") is None
-    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
-        conn.execute("DELETE FROM app.negocios WHERE owner_id = 'owner-test'")
-        conn.commit()

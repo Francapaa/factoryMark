@@ -89,11 +89,11 @@ def _fixtures() -> dict:
 
 
 def _enrich_with_details(
-    comp: Competitor, errors: list[str]
+    comp: Competitor, errors: list[str], *, refresh: bool = False
 ) -> tuple[list[str], list[int], str | None]:
     """Details de un competidor. Devuelve (review_texts, review_ratings, last_review_iso)."""
     try:
-        details = fetch_place_details(comp.place_id)
+        details = fetch_place_details(comp.place_id, refresh=refresh)
     except (httpx.HTTPError, RuntimeError, OSError, ValueError) as exc:
         # Degrada: se queda con campos de Search.
         errors.append(f"{comp.place_id}: {exc}")
@@ -109,8 +109,13 @@ def _enrich_with_details(
 
 
 def _maps_branch(
-    business_type: str, zone: str, anchor, errors: list[str]
-) -> tuple[list[dict], dict, dict]:
+    business_type: str,
+    zone: str,
+    anchor,
+    errors: list[str],
+    *,
+    refresh: bool = False,
+) -> tuple[list[dict], dict, dict, dict]:
     bias = None
     if anchor and anchor.latitude is not None and anchor.longitude is not None:
         bias = {
@@ -118,7 +123,9 @@ def _maps_branch(
             "longitude": anchor.longitude,
             "radius_m": settings.search_radius_m,
         }
-    found = search_competitors(business_type, zone, location_bias=bias)
+    found = search_competitors(
+        business_type, zone, location_bias=bias, refresh=refresh
+    )
     competitors, reviews, ratings_by_place, last_by_place = [], {}, {}, {}
     for comp in found:
         if anchor and comp.place_id == anchor.place_id:
@@ -128,7 +135,7 @@ def _maps_branch(
             comp.distance_m = round(
                 haversine_m(bias["latitude"], bias["longitude"], comp.latitude, comp.longitude), 1
             )
-        texts, ratings, last = _enrich_with_details(comp, errors)
+        texts, ratings, last = _enrich_with_details(comp, errors, refresh=refresh)
         if texts:
             reviews[comp.place_id] = texts
             if ratings:
@@ -149,14 +156,19 @@ def _online_queries(business_name: str, business_type: str, zone: str) -> list[s
 
 
 def _web_branch(
-    business_name: str, business_type: str, zone: str, errors: list[str]
+    business_name: str,
+    business_type: str,
+    zone: str,
+    errors: list[str],
+    *,
+    refresh: bool = False,
 ) -> tuple[list[dict], dict, list[dict]]:
     from tools.tavily import search_web_signals
 
     signals: list[dict] = []
     for q in _online_queries(business_name, business_type, zone):
         try:
-            signals.extend(search_web_signals(q))
+            signals.extend(search_web_signals(q, refresh=refresh))
         except (httpx.HTTPError, RuntimeError, OSError, ValueError) as exc:
             errors.append(f"tavily '{q}': {exc}")
     competitors, reviews, seen = [], {}, set()
@@ -187,10 +199,23 @@ def researcher_node(state: dict) -> dict:
     business_type = (state.get("business_type") or "").strip()
     zone = (state.get("zone") or "").strip()
     channel = state.get("sales_channel") or "local"
+    refresh_places = bool(state.get("refresh_places"))
     errors: list[str] = []
 
+    wants_maps = channel in ("local", "mixto")
+    wants_web = channel in ("online", "mixto") or (channel == "local" and settings.tavily_enabled)
+
     if not settings.google_places_api_key and not settings.tavily_api_key:
+        if refresh_places:
+            raise RuntimeError(
+                "Refrescar el análisis requiere GOOGLE_PLACES_API_KEY en backend/.env"
+            )
         return _fixtures()
+
+    if refresh_places and wants_maps and not settings.google_places_api_key:
+        raise RuntimeError(
+            "Falta GOOGLE_PLACES_API_KEY en backend/.env para refrescar desde Google Maps"
+        )
 
     anchor = None
     competitors: list[dict] = []
@@ -199,16 +224,15 @@ def researcher_node(state: dict) -> dict:
     last_by_place: dict[str, str] = {}
     web_signals: list[dict] = []
 
-    wants_maps = channel in ("local", "mixto")
-    wants_web = channel in ("online", "mixto") or (channel == "local" and settings.tavily_enabled)
-
     if wants_maps:
         if not settings.google_places_api_key:
             errors.append("sin GOOGLE_PLACES_API_KEY: rama Maps omitida")
         else:
-            anchor = resolve_anchor(business_name, zone)  # 404 explícito si no existe
+            anchor = resolve_anchor(
+                business_name, zone, refresh=refresh_places
+            )  # 404 explícito si no existe
             maps_comps, maps_reviews, maps_ratings, maps_last = _maps_branch(
-                business_type, zone, anchor, errors
+                business_type, zone, anchor, errors, refresh=refresh_places
             )
             competitors.extend(maps_comps)
             reviews.update(maps_reviews)
@@ -226,7 +250,7 @@ def researcher_node(state: dict) -> dict:
             errors.append(msg)
         else:
             web_comps, web_reviews, web_signals = _web_branch(
-                business_name, business_type, zone, errors
+                business_name, business_type, zone, errors, refresh=refresh_places
             )
             have_ids = {c["place_id"] for c in competitors}
             for c in web_comps:

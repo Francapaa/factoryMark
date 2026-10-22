@@ -1,17 +1,41 @@
 "use client";
 
-import { FileCheck } from "lucide-react";
+import { FileCheck, Loader2 } from "lucide-react";
 import type { Opportunity } from "@/types/analysis";
 import type { DashboardPost } from "@/types/dashboard";
 import { EmptyState } from "./SectionCard";
 
+function LoadingBlock({ text }: { text: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-[#FF5C00]/25 bg-black/50 p-5">
+      <Loader2 className="h-5 w-5 animate-spin text-[#FF5C00]" />
+      <p className="font-display font-semibold text-white">{text}</p>
+    </div>
+  );
+}
+
+function NewTag() {
+  return (
+    <span className="rounded-full bg-[#FF5C00]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#FFB25C]">
+      Nueva
+    </span>
+  );
+}
+
 export function OpportunitiesSection({
   opportunities,
   searched,
+  loading,
+  newCount,
 }: {
   opportunities: Opportunity[];
   searched: boolean;
+  loading: boolean;
+  newCount: number;
 }) {
+  if (loading) {
+    return <LoadingBlock text="Cargando oportunidades…" />;
+  }
   if (!searched || opportunities.length === 0) {
     return (
       <EmptyState
@@ -27,11 +51,20 @@ export function OpportunitiesSection({
     <div className="rounded-2xl border border-[#FF5C00]/25 bg-[#FF5C00]/[0.06] p-5">
       <p className="font-display text-[11px] font-semibold uppercase tracking-[0.2em] text-[#FFB25C]">
         Oportunidades
+        {newCount > 0 && (
+          <span className="text-[#FFD9A3]">
+            {" "}
+            · {newCount} {newCount === 1 ? "nueva" : "nuevas"}
+          </span>
+        )}
       </p>
       <ul className="mt-3 flex flex-col gap-2.5">
         {opportunities.map((o) => (
-          <li key={o.title} className="rounded-xl bg-black/50 p-3 text-sm">
-            <p className="font-medium text-white">{o.title}</p>
+          <li key={o.key || o.title} className="rounded-xl bg-black/50 p-3 text-sm">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium text-white">{o.title}</p>
+              {o.is_new && <NewTag />}
+            </div>
             <p className="mt-1 text-xs text-zinc-500">
               {o.evidence} · confianza {o.confidence}
             </p>
@@ -46,11 +79,16 @@ export function PublicationsSection({
   draft,
   opportunityTitle,
   searched,
+  loading,
 }: {
   draft: DashboardPost | null;
   opportunityTitle?: string;
   searched: boolean;
+  loading: boolean;
 }) {
+  if (loading) {
+    return <LoadingBlock text="Cargando el borrador…" />;
+  }
   if (!draft) {
     return (
       <EmptyState

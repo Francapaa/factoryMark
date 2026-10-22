@@ -46,6 +46,40 @@ def test_cache_hit_sin_llamadas(monkeypatch, tmp_path):
     assert len(out) == 1
 
 
+def test_refresh_ignora_cache_y_actualiza_la_guardada(monkeypatch, tmp_path):
+    monkeypatch.setattr(tavily.settings, "tavily_api_key", "k")
+    tavily.search_web_signals(
+        "café online",
+        client=_client(lambda r: httpx.Response(200, json=_payload())),
+        cache_dir=tmp_path,
+    )
+
+    fresh_payload = {
+        "results": [
+            {
+                "url": "https://nueva.example/producto",
+                "title": "Nueva Tienda",
+                "content": "Nuevo resultado en vivo.",
+            }
+        ]
+    }
+    out = tavily.search_web_signals(
+        "café online",
+        client=_client(lambda r: httpx.Response(200, json=fresh_payload)),
+        cache_dir=tmp_path,
+        refresh=True,
+    )
+    assert [s["url"] for s in out] == ["https://nueva.example/producto"]
+
+    def boom(request: httpx.Request) -> httpx.Response:
+        raise AssertionError("debió releer la caché actualizada")
+
+    cached = tavily.search_web_signals(
+        "café online", client=_client(boom), cache_dir=tmp_path
+    )
+    assert [s["url"] for s in cached] == ["https://nueva.example/producto"]
+
+
 def test_retry_ante_429(monkeypatch, tmp_path):
     monkeypatch.setattr(tavily.settings, "tavily_api_key", "k")
     calls = {"n": 0}

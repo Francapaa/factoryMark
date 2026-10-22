@@ -77,9 +77,9 @@ def test_sin_base_url_da_503(monkeypatch):
 def test_auth_disabled_permite_pasar(monkeypatch):
     monkeypatch.setattr(settings, "auth_disabled", True)
     monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
-    r = client.post("/api/analyze", json=PAYLOAD)
+    r = client.get("/api/businesses/mine")
     assert r.status_code == 200
-    assert r.json()["meta"]["user_id"] == "dev-user"
+    assert r.json()["owner_id"] == "dev-user"
 
 
 def test_usuario_mockeado_llega_al_endpoint(monkeypatch):
@@ -92,9 +92,9 @@ def test_usuario_mockeado_llega_al_endpoint(monkeypatch):
     _app.dependency_overrides[auth.get_current_user] = _fake_dep
     monkeypatch.setattr(db, "get_my_business", lambda owner_id: _saved(owner_id))
     try:
-        r = client.post("/api/analyze", json=PAYLOAD)
+        r = client.get("/api/businesses/mine")
         assert r.status_code == 200
-        assert r.json()["meta"]["user_id"] == "u-123"
+        assert r.json()["owner_id"] == "u-123"
     finally:
         _app.dependency_overrides.clear()
 

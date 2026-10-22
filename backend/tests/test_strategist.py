@@ -189,3 +189,67 @@ def test_ejemplo_de_cluster_no_se_repite_en_categoria():
     )
     joined = _evidences(out["opportunities"])
     assert joined.count(x[:40]) == 1
+
+
+def test_key_categoria_estable_cuando_cambia_el_conteo():
+    def run(n: int) -> list[dict]:
+        return strategist_node(
+            {
+                "clusters": [],
+                "reviews_by_place": {"p1": ["Carísimo todo"] * n},
+                "review_ratings": {"p1": [1] * n},
+            }
+        )["opportunities"]
+
+    first = run(2)
+    later = run(5)
+    assert first[0]["key"] == later[0]["key"] == "category:precios-altos"
+    assert first[0]["title"] != later[0]["title"]
+
+
+def test_keys_de_cluster_y_fallback():
+    clustered = strategist_node(
+        {
+            "clusters": [
+                {"topic": "Esperas y demoras", "count": 3, "avg_sentiment": -0.6}
+            ]
+        }
+    )["opportunities"]
+    assert clustered[0]["key"] == "cluster:esperas-y-demoras"
+
+    fallback = strategist_node(
+        {"clusters": [{"topic": "todo bien", "count": 10, "avg_sentiment": 0.8}]}
+    )["opportunities"]
+    assert fallback[0]["key"] == "none"
+
+
+def test_cluster_general_no_tapa_las_categorias():
+    t1 = "Carísimo todo, precios por las nubes"
+    t2 = "Muy caro para lo que dan"
+    out = strategist_node(
+        {
+            "clusters": [
+                {
+                    "topic": "general",
+                    "count": 2,
+                    "avg_sentiment": -0.8,
+                    "example_texts": [t1, t2],
+                }
+            ],
+            "reviews_by_place": {"p1": [t1, t2]},
+            "review_ratings": {"p1": [1, 1]},
+        }
+    )
+    assert [o["key"] for o in out["opportunities"]] == ["category:precios-altos"]
+
+
+def test_key_de_review_individual_es_estable():
+    state = {
+        "clusters": [],
+        "reviews_by_place": {"p1": ["Jamás regreso", "Terrible experiencia"]},
+        "review_ratings": {"p1": [3, 3]},
+    }
+    first = strategist_node(state)["opportunities"]
+    later = strategist_node(state)["opportunities"]
+    assert [o["key"] for o in first] == [o["key"] for o in later]
+    assert all(o["key"].startswith("review:p1:") for o in first)

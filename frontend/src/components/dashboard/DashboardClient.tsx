@@ -4,6 +4,7 @@ import { useCallback, useEffect, useReducer } from "react";
 import { useRouter } from "next/navigation";
 import { Flame } from "lucide-react";
 import { AuthRequiredError, apiFetch } from "@/lib/api";
+import { AnalysisError, getLatestAnalysis, runAnalysis } from "@/lib/analysis";
 import { getMyBusiness } from "@/lib/businesses";
 import { completeInstagramCallback } from "@/lib/instagram";
 import {
@@ -24,6 +25,46 @@ import { InstagramCard } from "./InstagramCard";
 import { ScheduledPosts } from "./ScheduledPosts";
 import { SectionCard } from "./SectionCard";
 
+function toDashboardData(result: AnalyzeResultWithScore) {
+  const competitors = [...result.competitors].sort((a, b) => {
+    if (a.score != null && b.score != null) return b.score - a.score;
+    if (a.score != null) return -1;
+    if (b.score != null) return 1;
+    if (a.distance_m != null && b.distance_m != null) return a.distance_m - b.distance_m;
+    return 0;
+  });
+  const draft: DashboardPost | null = result.draft_post
+    ? {
+        id: "draft-actual",
+        state: "borrador",
+        copy_text: result.draft_post.copy_text,
+        hashtags: result.draft_post.hashtags,
+      }
+    : null;
+  return {
+    analysis: result.analysis ?? null,
+    competitors,
+    opportunities: result.opportunities,
+    draft,
+  };
+}
+
+function analysisErrorMessage(e: unknown): string {
+  if (e instanceof AnalysisError) {
+    if (e.code === "analisis_no_guardado") {
+      return "No se guardó el análisis nuevo, así que no reemplazamos lo que había.";
+    }
+    if (e.status === 404) {
+      return "No encontramos tu negocio en Maps con esos datos. Verificá el nombre en el onboarding.";
+    }
+    if (e.status === 409) {
+      return "Completá tu onboarding antes de analizar: tu negocio aún no está guardado.";
+    }
+    return e.message;
+  }
+  return e instanceof Error ? e.message : "Falló el análisis de tu zona";
+}
+
 export function DashboardClient() {
   const router = useRouter();
   const [state, dispatch] = useReducer(dashboardReducer, initialDashboardState);
@@ -35,6 +76,11 @@ export function DashboardClient() {
     opportunities,
     draft,
     searched,
+    analysis,
+    analysisLoading,
+    refreshing,
+    refreshError,
+    retry,
     ig,
   } = state;
 
@@ -160,84 +206,55 @@ export function DashboardClient() {
     };
   }, [router]);
 
-  const search = useCallback(async () => {
-    if (!business) return;
-    dispatch({ type: "comp/set", state: { status: "loading" } });
+  const loadLatest = useCallback(async () => {
+    dispatch({ type: "analysis/loading" });
     try {
-      const res = await apiFetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          business_name: business.name,
-          business_type: business.business_type,
-          zone: business.zone,
-          sales_channel: business.sales_channel,
-        }),
-      });
-      if (res.status === 404) {
-        dispatch({
-          type: "comp/set",
-          state: {
-            status: "error",
-            message:
-              "No encontramos tu negocio en Maps con esos datos. Verificá el nombre en el onboarding.",
-          },
-        });
+      const latest = await getLatestAnalysis();
+      if (latest === null) {
+        dispatch({ type: "analysis/empty" });
         return;
       }
-      if (res.status === 409) {
-        dispatch({
-          type: "comp/set",
-          state: {
-            status: "error",
-            message:
-              "Completá tu onboarding antes de analizar: tu negocio aún no está guardado.",
-          },
-        });
-        return;
-      }
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { detail?: unknown } | null;
-        const detail =
-          typeof body?.detail === "string" ? body.detail : `Error ${res.status}`;
-        throw new Error(detail);
-      }
-      const result = (await res.json()) as AnalyzeResultWithScore;
-      const competitors = [...result.competitors].sort((a, b) => {
-        if (a.score != null && b.score != null) return b.score - a.score;
-        if (a.score != null) return -1;
-        if (b.score != null) return 1;
-        if (a.distance_m != null && b.distance_m != null) return a.distance_m - b.distance_m;
-        return 0;
-      });
-      const nextDraft: DashboardPost | null = result.draft_post
-        ? {
-            id: "draft-actual",
-            state: "borrador",
-            copy_text: result.draft_post.copy_text,
-            hashtags: result.draft_post.hashtags,
-          }
-        : null;
-      dispatch({
-        type: "analysis/success",
-        competitors,
-        opportunities: result.opportunities,
-        draft: nextDraft,
-      });
+      dispatch({ type: "analysis/success", ...toDashboardData(latest) });
     } catch (e) {
       if (e instanceof AuthRequiredError) {
         router.push("/login");
         return;
       }
       dispatch({
-        type: "comp/set",
-        state: {
-          status: "error",
-          message: e instanceof Error ? e.message : "Falló el análisis de tu zona",
-        },
+        type: "analysis/load-error",
+        message: analysisErrorMessage(e),
+        retry: "load",
       });
     }
-  }, [business, router]);
+  }, [router]);
+
+  const analyze = useCallback(
+    async (refreshPlaces: boolean) => {
+      if (!business) return;
+      const hasData = analysis !== null;
+      dispatch({ type: hasData ? "analysis/refreshing" : "analysis/analyzing" });
+      try {
+        const result = await runAnalysis(business, { refreshPlaces });
+        dispatch({ type: "analysis/success", ...toDashboardData(result) });
+      } catch (e) {
+        if (e instanceof AuthRequiredError) {
+          router.push("/login");
+          return;
+        }
+        const message = analysisErrorMessage(e);
+        if (hasData) {
+          dispatch({ type: "analysis/refresh-error", message });
+        } else {
+          dispatch({ type: "analysis/load-error", message, retry: "analyze" });
+        }
+      }
+    },
+    [business, analysis, router]
+  );
+
+  useEffect(() => {
+    void loadLatest();
+  }, [loadLatest]);
 
   function setIg(next: typeof ig) {
     dispatch({ type: "ig/set", state: next });
@@ -292,14 +309,26 @@ export function DashboardClient() {
         <SectionCard
           badge="Competencia"
           title="Quién compite con vos"
-          hint="Búsqueda real en Maps por cercanía a tu local, con distancias y origen."
+          hint="La última foto guardada aparece al entrar. Refrescá para volver a consultar las fuentes en vivo."
         >
           {businessMissing || (!businessLoading && !business) ? (
             <p className="rounded-2xl border border-white/10 bg-black/50 p-5 text-center text-sm text-zinc-400">
               Guardá tu negocio primero para buscar competidores en tu zona.
             </p>
           ) : (
-            <CompetitorsSection state={comp} onSearch={search} />
+            <CompetitorsSection
+              state={comp}
+              analysis={analysis}
+              analysisLoading={analysisLoading}
+              refreshing={refreshing}
+              refreshError={refreshError}
+              onAnalyze={() => void analyze(false)}
+              onRefresh={() => void analyze(true)}
+              onRetry={() => {
+                if (retry === "analyze") void analyze(false);
+                else void loadLatest();
+              }}
+            />
           )}
         </SectionCard>
 
@@ -309,7 +338,12 @@ export function DashboardClient() {
             title="Huecos detectados"
             hint="Lo que nadie cubre, con evidencia y confianza."
           >
-            <OpportunitiesSection opportunities={opportunities} searched={searched} />
+            <OpportunitiesSection
+              opportunities={opportunities}
+              searched={searched}
+              loading={comp.status === "loading"}
+              newCount={analysis?.new_opportunities ?? 0}
+            />
           </SectionCard>
           <SectionCard
             badge="Instagram"
@@ -329,6 +363,7 @@ export function DashboardClient() {
             draft={draft}
             opportunityTitle={opportunities[0]?.title}
             searched={searched}
+            loading={comp.status === "loading"}
           />
         </SectionCard>
 

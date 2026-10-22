@@ -47,6 +47,37 @@ def _row_to_business(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _row_to_competitor(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "place_id": row["place_id"],
+        "name": row["name"],
+        "rating": row.get("rating"),
+        "user_ratings_total": int(row.get("user_ratings_total") or 0),
+        "address": row.get("address") or "",
+        "cached": bool(row.get("cached")),
+        "source": row.get("source") or "maps",
+        "distance_m": row.get("distance_m"),
+        "opening_hours": list(row.get("opening_hours") or []),
+        "photos": list(row.get("photos") or []),
+        "website": row.get("website") or "",
+        "reviews_fetched": int(row.get("reviews_fetched") or 0),
+        "latitude": row.get("latitude"),
+        "longitude": row.get("longitude"),
+        "score": row.get("score"),
+        "is_new": bool(row.get("is_new")),
+    }
+
+
+def _row_to_opportunity(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "key": row["key"],
+        "title": row["title"],
+        "evidence": row["evidence"],
+        "confidence": row["confidence"],
+        "is_new": bool(row.get("is_new")),
+    }
+
+
 def get_my_business(owner_id: str) -> dict[str, Any] | None:
     """Lee el único negocio del dueño. None si no completó onboarding."""
     with _connect() as conn, conn.cursor() as cur:
@@ -75,10 +106,37 @@ def save_my_business(
     anchor_snapshot: dict[str, Any],
     brand_kit: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Guarda (upsert) el único negocio del dueño. Re-onboarding reemplaza la fila."""
+    """Guarda (upsert) el único negocio del dueño. Re-onboarding reemplaza la fila.
+
+    Si cambia la identidad del negocio (nombre, tipo, canal, zona o ancla), los
+    análisis guardados dejan de ser válidos y se borran en la misma transacción.
+    """
     import json
 
     with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, name, business_type, sales_channel, zone, anchor_place_id
+              FROM app.negocios
+             WHERE owner_id = %(owner_id)s
+             FOR UPDATE
+            """,
+            {"owner_id": owner_id},
+        )
+        existing = cur.fetchone()
+        if existing is not None:
+            incoming = {
+                "name": name,
+                "business_type": business_type,
+                "sales_channel": sales_channel,
+                "zone": zone,
+                "anchor_place_id": anchor_place_id,
+            }
+            if any(str(existing[key]) != str(value) for key, value in incoming.items()):
+                cur.execute(
+                    "DELETE FROM app.analisis WHERE business_id = %(business_id)s::uuid",
+                    {"business_id": str(existing["id"])},
+                )
         cur.execute(
             """
             INSERT INTO app.negocios
@@ -115,6 +173,267 @@ def save_my_business(
         conn.commit()
     assert row is not None
     return _row_to_business(row)
+
+
+def save_analysis_run(
+    business_id: str,
+    *,
+    competitors: list[dict[str, Any]],
+    opportunities: list[dict[str, Any]],
+    clusters: list[dict[str, Any]],
+    draft_post: dict[str, Any] | None,
+    meta: dict[str, Any],
+) -> dict[str, Any]:
+    """Persiste una corrida completa y devuelve qué entidades son nuevas.
+
+    Todo ocurre en una transacción: si falla cualquier insert, no queda una
+    corrida a medias ni entidades huérfanas.
+    """
+    import json
+
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT EXISTS (
+                SELECT 1 FROM app.analisis WHERE business_id = %(business_id)s::uuid
+            ) AS has_runs
+            """,
+            {"business_id": business_id},
+        )
+        previous = cur.fetchone()
+        assert previous is not None
+        is_first_run = not previous["has_runs"]
+
+        cur.execute(
+            """
+            INSERT INTO app.analisis (
+                business_id, clusters, draft_post, meta, is_first_run
+            )
+            VALUES (
+                %(business_id)s::uuid, %(clusters)s::jsonb,
+                %(draft_post)s::jsonb, %(meta)s::jsonb, %(is_first_run)s
+            )
+            RETURNING id, created_at
+            """,
+            {
+                "business_id": business_id,
+                "clusters": json.dumps(clusters),
+                "draft_post": json.dumps(draft_post) if draft_post is not None else None,
+                "meta": json.dumps(meta),
+                "is_first_run": is_first_run,
+            },
+        )
+        run = cur.fetchone()
+        assert run is not None
+        run_id = str(run["id"])
+
+        new_competitor_ids: list[str] = []
+        for comp in competitors:
+            cur.execute(
+                """
+                INSERT INTO app.competidores (
+                    business_id, place_id, name, rating, user_ratings_total,
+                    address, source, distance_m, opening_hours, photos, website,
+                    reviews_fetched, latitude, longitude, score, cached,
+                    first_seen_run_id, last_seen_run_id, first_seen_at, last_seen_at
+                ) VALUES (
+                    %(business_id)s::uuid, %(place_id)s, %(name)s, %(rating)s,
+                    %(user_ratings_total)s, %(address)s, %(source)s, %(distance_m)s,
+                    %(opening_hours)s::jsonb, %(photos)s::jsonb, %(website)s,
+                    %(reviews_fetched)s, %(latitude)s, %(longitude)s, %(score)s,
+                    %(cached)s, %(run_id)s::uuid, %(run_id)s::uuid, now(), now()
+                )
+                ON CONFLICT (business_id, place_id) DO UPDATE SET
+                    name = EXCLUDED.name,
+                    rating = EXCLUDED.rating,
+                    user_ratings_total = EXCLUDED.user_ratings_total,
+                    address = EXCLUDED.address,
+                    source = EXCLUDED.source,
+                    distance_m = EXCLUDED.distance_m,
+                    opening_hours = EXCLUDED.opening_hours,
+                    photos = EXCLUDED.photos,
+                    website = EXCLUDED.website,
+                    reviews_fetched = EXCLUDED.reviews_fetched,
+                    latitude = EXCLUDED.latitude,
+                    longitude = EXCLUDED.longitude,
+                    score = EXCLUDED.score,
+                    cached = EXCLUDED.cached,
+                    last_seen_run_id = EXCLUDED.last_seen_run_id,
+                    last_seen_at = now()
+                RETURNING (first_seen_run_id = %(run_id)s::uuid) AS is_new
+                """,
+                {
+                    "business_id": business_id,
+                    "run_id": run_id,
+                    "place_id": comp["place_id"],
+                    "name": comp["name"],
+                    "rating": comp.get("rating"),
+                    "user_ratings_total": int(comp.get("user_ratings_total") or 0),
+                    "address": comp.get("address") or "",
+                    "source": comp.get("source") or "maps",
+                    "distance_m": comp.get("distance_m"),
+                    "opening_hours": json.dumps(comp.get("opening_hours") or []),
+                    "photos": json.dumps(comp.get("photos") or []),
+                    "website": comp.get("website") or "",
+                    "reviews_fetched": int(comp.get("reviews_fetched") or 0),
+                    "latitude": comp.get("latitude"),
+                    "longitude": comp.get("longitude"),
+                    "score": comp.get("score"),
+                    "cached": bool(comp.get("cached")),
+                },
+            )
+            row = cur.fetchone()
+            if row and row["is_new"] and not is_first_run:
+                new_competitor_ids.append(comp["place_id"])
+
+        new_opportunity_keys: list[str] = []
+        for opp in opportunities:
+            cur.execute(
+                """
+                INSERT INTO app.oportunidades (
+                    business_id, key, title, evidence, confidence,
+                    first_seen_run_id, last_seen_run_id, first_seen_at, last_seen_at
+                ) VALUES (
+                    %(business_id)s::uuid, %(key)s, %(title)s, %(evidence)s,
+                    %(confidence)s, %(run_id)s::uuid, %(run_id)s::uuid, now(), now()
+                )
+                ON CONFLICT (business_id, key) DO UPDATE SET
+                    title = EXCLUDED.title,
+                    evidence = EXCLUDED.evidence,
+                    confidence = EXCLUDED.confidence,
+                    last_seen_run_id = EXCLUDED.last_seen_run_id,
+                    last_seen_at = now()
+                RETURNING (first_seen_run_id = %(run_id)s::uuid) AS is_new
+                """,
+                {
+                    "business_id": business_id,
+                    "run_id": run_id,
+                    "key": opp["key"],
+                    "title": opp["title"],
+                    "evidence": opp["evidence"],
+                    "confidence": opp["confidence"],
+                },
+            )
+            row = cur.fetchone()
+            if (
+                row
+                and row["is_new"]
+                and not is_first_run
+                and opp["key"] != "none"
+            ):
+                new_opportunity_keys.append(opp["key"])
+
+        cur.execute(
+            """
+            UPDATE app.analisis
+               SET competitors_count = %(competitors_count)s,
+                   opportunities_count = %(opportunities_count)s,
+                   new_competitors_count = %(new_competitors_count)s,
+                   new_opportunities_count = %(new_opportunities_count)s
+             WHERE id = %(run_id)s::uuid
+            """,
+            {
+                "run_id": run_id,
+                "competitors_count": len(competitors),
+                "opportunities_count": len(opportunities),
+                "new_competitors_count": len(new_competitor_ids),
+                "new_opportunities_count": len(new_opportunity_keys),
+            },
+        )
+        conn.commit()
+
+    return {
+        "analysis": {
+            "id": run_id,
+            "analyzed_at": run["created_at"].isoformat(),
+            "competitors_count": len(competitors),
+            "opportunities_count": len(opportunities),
+            "new_competitors": len(new_competitor_ids),
+            "new_opportunities": len(new_opportunity_keys),
+        },
+        "new_competitor_ids": new_competitor_ids,
+        "new_opportunity_keys": new_opportunity_keys,
+    }
+
+
+def get_latest_analysis(business_id: str) -> dict[str, Any] | None:
+    """Última corrida guardada + las entidades que siguen vigentes en ella."""
+    with _connect() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT id, competitors_count, opportunities_count,
+                   new_competitors_count, new_opportunities_count,
+                   clusters, draft_post, meta, is_first_run, created_at
+              FROM app.analisis
+             WHERE business_id = %(business_id)s::uuid
+             ORDER BY created_at DESC, id DESC
+             LIMIT 1
+            """,
+            {"business_id": business_id},
+        )
+        run = cur.fetchone()
+        if run is None:
+            return None
+        run_id = str(run["id"])
+        is_first_run = bool(run["is_first_run"])
+        cur.execute(
+            """
+            SELECT place_id, name, rating, user_ratings_total, address, source,
+                   distance_m, opening_hours, photos, website, reviews_fetched,
+                   latitude, longitude, score, cached,
+                   (first_seen_run_id = %(run_id)s::uuid
+                    AND NOT %(is_first_run)s::boolean) AS is_new
+              FROM app.competidores
+             WHERE business_id = %(business_id)s::uuid
+               AND last_seen_run_id = %(run_id)s::uuid
+             ORDER BY score DESC NULLS LAST, distance_m ASC NULLS LAST, name ASC
+            """,
+            {
+                "business_id": business_id,
+                "run_id": run_id,
+                "is_first_run": is_first_run,
+            },
+        )
+        competitors = [_row_to_competitor(row) for row in cur.fetchall()]
+        cur.execute(
+            """
+            SELECT key, title, evidence, confidence,
+                   (first_seen_run_id = %(run_id)s::uuid
+                    AND NOT %(is_first_run)s::boolean
+                    AND key <> 'none') AS is_new
+              FROM app.oportunidades
+             WHERE business_id = %(business_id)s::uuid
+               AND last_seen_run_id = %(run_id)s::uuid
+             ORDER BY CASE confidence
+                        WHEN 'alta' THEN 0
+                        WHEN 'media' THEN 1
+                        ELSE 2
+                      END,
+                      first_seen_at ASC
+            """,
+            {
+                "business_id": business_id,
+                "run_id": run_id,
+                "is_first_run": is_first_run,
+            },
+        )
+        opportunities = [_row_to_opportunity(row) for row in cur.fetchall()]
+
+    return {
+        "analysis": {
+            "id": run_id,
+            "analyzed_at": run["created_at"].isoformat(),
+            "competitors_count": int(run["competitors_count"]),
+            "opportunities_count": int(run["opportunities_count"]),
+            "new_competitors": int(run["new_competitors_count"]),
+            "new_opportunities": int(run["new_opportunities_count"]),
+        },
+        "competitors": competitors,
+        "opportunities": opportunities,
+        "clusters": list(run["clusters"] or []),
+        "draft_post": run["draft_post"],
+        "meta": run["meta"] or {},
+    }
 
 
 # --- Instagram v2: conexiones (token cifrado) + cola de programadas ---
